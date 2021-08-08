@@ -15,14 +15,13 @@ train_loader = torch.utils.data.DataLoader(
                                ])),
     batch_size=batch_size, shuffle=True)
 
-test_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.MNIST('mnist_data', train=False, download=True,
-                               transform=torchvision.transforms.Compose([
-                                   torchvision.transforms.ToTensor(),
-                                   # torchvision.transforms.Normalize(
-                                   #     (0.1207,), (0.3081,))
-                               ])),
-    batch_size=batch_size, shuffle=False)
+mnist_test = torchvision.datasets.MNIST('mnist_data', train=False, download=True,
+                                        transform=torchvision.transforms.Compose([
+                                            torchvision.transforms.ToTensor(),
+                                            # torchvision.transforms.Normalize(
+                                            #     (0.1207,), (0.3081,))
+                                        ]))
+test_loader = torch.utils.data.DataLoader(mnist_test, batch_size=mnist_test.data.shape[0], shuffle=False)
 
 x, y = next(iter(train_loader))
 print(x.shape, y.shape)
@@ -68,8 +67,20 @@ def training():
             loss.backward()
             # w' = w - lr * grad_parameter
             optimizer.step()
+
             if batch_idx % 10 == 0:
-                print(f'epoch: {epoch}, loss:{loss}, acc:{None}')
+                print(f'epoch: {epoch}, batch: {batch_idx}, loss:{loss}')
+        single_label_counter = np.zeros((10, 1))
+        single_label_acc = np.zeros((10, 1))
+        for test_idx, (x_test, y_test) in enumerate(test_loader):
+            for labels in range(10):
+                single_labels_index = np.squeeze(np.argwhere(y_test.numpy() == labels))
+                single_labels_x_test = x_test[single_labels_index, :, :, :].view(-1, 28*28)
+                result = net(single_labels_x_test)
+                result = torch.argmax(result, dim=1)
+                correct = torch.eq(result, y_test[single_labels_index])
+                single_label_acc[labels, :] = torch.mean(correct.float())
+                print(f'Test acc of num {labels}: {single_label_acc[labels, :]}')
 
 
 if __name__ == '__main__':
