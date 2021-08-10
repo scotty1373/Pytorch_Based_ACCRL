@@ -3,7 +3,6 @@ import torch
 import torchvision
 import numpy as np
 
-
 batch_size = 128
 
 train_loader = torch.utils.data.DataLoader(
@@ -52,6 +51,7 @@ class Net_Builder(torch.nn.Module):
 
 def training():
     global net
+    train_loss_ = np.zeros((3, 60000//batch_size))
     for epoch in range(3):
         # the parameter which need to update, put the parameter in optimizer's parameter option
         optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
@@ -67,10 +67,10 @@ def training():
             loss.backward()
             # w' = w - lr * grad_parameter
             optimizer.step()
-
+            train_loss_[epoch, batch_size] = loss
             if batch_idx % 10 == 0:
                 print(f'epoch: {epoch}, batch: {batch_idx}, loss:{loss}')
-        single_label_counter = np.zeros((10, 1))
+
         single_label_acc = np.zeros((10, 1))
         for test_idx, (x_test, y_test) in enumerate(test_loader):
             for labels in range(10):
@@ -81,6 +81,7 @@ def training():
                 correct = torch.eq(result, y_test[single_labels_index])
                 single_label_acc[labels, :] = torch.mean(correct.float())
                 print(f'Test acc of num {labels}: {single_label_acc[labels, :]}')
+        print(f'loss mean: {np.mean(train_loss_[epoch, :])}')
 
 
 if __name__ == '__main__':
