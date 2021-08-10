@@ -89,3 +89,15 @@ tensor.view()和tensor.reshape()
 tensor_a.view(3, 3) <=> tensor_a.reshape(3,3)
 ```
 
+tensor.unsqueeze()
+
+```python
+# dim -> 0   1   2   3
+#		-4  -3  -2  -1
+# unsqueeze用于在axis增加维度
+x = torch.rand((2, 3, 28, 28))	# axis = 4的数据
+y = x.unsqueeze(1)	# 表示在axis=1的维度之前插入一个维度（pytorch常用dim，tensorflow常用axis，两者表达相同）
+y.shape
+torch.Size([2, 1, 3, 28, 28])
+```
+
