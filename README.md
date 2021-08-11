@@ -101,3 +101,76 @@ y.shape
 torch.Size([2, 1, 3, 28, 28])
 ```
 
+torch.cat([tensor_a, tensor_b], dim=Number)
+
+```python
+# cat方法与tf.concat(), np.concatante()用法一致都用于在原有维度上进行拼接，不会增加维度
+x = torch.rand((1,3,3))
+y = torch.rand((1,3,3))
+torch.cat([x, y], dim=0)
+-> tensor([[[0.2267, 0.5636, 0.8269],
+         [0.8434, 0.2561, 0.7266],
+         [0.0459, 0.9119, 0.7341]],
+        [[0.4417, 0.6696, 0.7375],
+         [0.3352, 0.4405, 0.3100],
+         [0.2330, 0.1244, 0.1808]]])
+torch.cat([x, y], dim=0).shape
+-> torch.Size([2, 3, 3])
+```
+
+torch.stack([tensor_a, tensor], dim=Number)  
+
+
+
+```python
+# stack方法与tf.stack(),np.stack()用法一致，用于将两个张量在一个新的维度拼接，会增加维度
+# dim位置表示新增加的维度在什么位置
+# stack位置之后的数组大小一定要相同，发否则报错
+x = torch.rand((1,3,3))
+y = torch.rand((1,3,3))
+torch.stack([x, y], dim=1).shape
+-> torch.Size([1, 2, 3, 3])
+torch.stack([x, y], dim=0).shape
+-> torch.Size([2, 1, 3, 3])
+```
+
+tensor.split(Number, dim=Number)
+
+```python
+# 方法按照给定dim将原张量按指定维度拆分成指定长度tensor，与tf.split()用法相同
+# 示例为将z分为长度为2，2，1三个长度的张量
+z = torch.rand((5,3,3))
+a,b,c = z.split([2,2,1], dim=0)
+a
+tensor([[[0.6907, 0.1767, 0.2757],
+         [0.0949, 0.6095, 0.0204],
+         [0.3591, 0.7025, 0.1655]],
+        [[0.8722, 0.5272, 0.8849],
+         [0.5268, 0.4994, 0.4219],
+         [0.1545, 0.1390, 0.5757]]])
+b
+tensor([[[0.4904, 0.2658, 0.3442],
+         [0.5530, 0.2156, 0.0235],
+         [0.1533, 0.5226, 0.0291]],
+        [[0.1012, 0.4376, 0.9082],
+         [0.8089, 0.9455, 0.0567],
+         [0.8221, 0.6370, 0.9685]]])
+c
+tensor([[[0.1732, 0.1510, 0.9870],
+         [0.7290, 0.7948, 0.9145],
+         [0.9889, 0.4717, 0.8628]]])
+
+```
+
+tensor.chunk(num, dim=num)
+
+```python
+# 方法将原tensor按维度以给定数量拆分
+z = torch.rand((6,3,3))
+a, b = z.chunk(2, dim=0)
+a.shape
+-> torch.Size([3, 3, 3])
+b.shape
+-> torch.Size([3, 3, 3])
+```
+
