@@ -5,7 +5,7 @@ import numpy as np
 
 class ResBlock(torch.nn.Module):
     def __init__(self, in_Channel, out_Channel, stride=1):
-        super(ResBlock, self).__init__()
+        super(ResBlock, self).  __init__()
         self.Conv1 = torch.nn.Conv2d(in_channels=in_Channel, out_channels=out_Channel, kernel_size=3, padding=1, stride=stride, bias=False)
         self.BatchNorm1 = torch.nn.BatchNorm2d(out_Channel)
         self.Conv2 = torch.nn.Conv2d(in_channels=out_Channel, out_channels=out_Channel, kernel_size=3, padding=1, stride=1, bias=False)
