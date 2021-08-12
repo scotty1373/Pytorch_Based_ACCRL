@@ -28,7 +28,7 @@ class ResBlock(torch.nn.Module):
 class ResNet(torch.nn.Module):
     def __init__(self, block_num):
         super(ResNet, self).__init__()
-        pass
+
 
 
     def forward(self):
