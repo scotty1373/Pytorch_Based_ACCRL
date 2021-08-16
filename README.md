@@ -297,3 +297,34 @@ x + y
             [30, 31, 32]])
 ```
 
+
+
+torch.nn.init.kaiming_normal_(tensor)
+
+```python
+'''
+根据He, K等人2015年在"深入研究了超越人类水平的性能：整流器在ImageNet分类"中描述的方法，采用正态分布，填充张量或变量。结果张量中的值采样自均值为0，标准差为sqrt(2/((1 + a^2) * fan_in))的正态分布。该方法也被称为He的初始化
+'''
+x = torch.rand((200, 784))
+torch.nn.init.kaiming_normal_(x)
+```
+
+nn.ReLu 与 F.relu()区别
+
+```python
+'''
+class-style API
+nn.ReLu()	对于这种类型为类风格API，不能进行直接调用，只能将类示例为方法再调用，通常用于Sequential模型构建(继承自nn.Module)，但是这种类型访问中间变量需要通过parameter参数间接访问
+function-style API
+F.relu()	方法风格API,直接访问调用，相比于上面的api，这种方法可以更直观更便捷的访问内部参数
+'''
+# 示例如下
+# function-style
+x = torch.rand((28, 28))
+x = torch.nn.functional.relu(x, inplace=True)
+# class-style
+layer = torch.nn.ReLU()
+z = layer(x)
+
+```
+
