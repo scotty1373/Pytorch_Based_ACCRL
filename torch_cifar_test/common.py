@@ -2,6 +2,7 @@
 import torch
 from cifar10_dataset_collect import dataset_collect
 from Lenet import Lenet as ln
+from resnet import ResNet
 
 batch_size = 64
 epoches = 100
