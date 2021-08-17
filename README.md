@@ -328,3 +328,7 @@ z = layer(x)
 
 ```
 
+
+
+##### torch.nn.Module类继承构建网络
+

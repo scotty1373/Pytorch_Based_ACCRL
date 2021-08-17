@@ -33,10 +33,11 @@ class ResNet(torch.nn.Module):
         self.image_channel = channel_list
         self.resnet_block = block_num
         self.net = self.net_initilize()
+        self.blk = torch.nn.Sequential()
 
     def forward(self, x):
         x = self.net(x)
-        x
+
 
     def Block_Builder(self, inchannel, outchannel, init=False):
         res_block = torch.nn.Sequential()
