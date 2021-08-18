@@ -9,12 +9,12 @@ def dataset_collect(batchsz):
         transforms.Resize((32, 32)),
         transforms.ToTensor()
     ]), download=True)
-    cifar_train = DataLoader(cifar_train, batch_size=batchsz, shuffle=True)
+    cifar_train = DataLoader(cifar_train, batch_size=batchsz[0], shuffle=True, num_workers=12)
 
     cifar_test = datasets.CIFAR10('cifar_test', train=False, transform=transforms.Compose([
         transforms.Resize((32, 32)),
         transforms.ToTensor()]), download=True)
-    cifar_test = DataLoader(cifar_test, batch_size=batchsz, shuffle=True)
+    cifar_test = DataLoader(cifar_test, batch_size=batchsz[1], shuffle=True, num_workers=12)
 
     # test
     # x, x_label = iter(cifar_train)
