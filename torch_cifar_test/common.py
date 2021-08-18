@@ -29,10 +29,10 @@ def train():
 
 
 if __name__ == "__main__":
-    model = ln(num_cate)
+    model = ResNet([2, 2, 2, 2], 4)
     device = torch.device('cpu')
     print(model)    # 打印类实例
-    optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = torch.nn.CrossEntropyLoss()
     train()
 
