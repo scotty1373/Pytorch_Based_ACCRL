@@ -47,8 +47,8 @@ class ResNet(torch.nn.Module):
 
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(512*4*4, 512),
-            torch.nn.Linear(512, 256),
-            torch.nn.Linear(256, 10)
+            torch.nn.Dropout(0.25),
+            torch.nn.Linear(512, 10)
         )
         # x = torch.rand((3, 3, 32, 32))
         # out = self.net(x)
