@@ -25,4 +25,4 @@ def dataset_collect(batchsz):
 
 
 if __name__ == "__main__":
-    dataset_collect()
+    dataset_collect(64)
