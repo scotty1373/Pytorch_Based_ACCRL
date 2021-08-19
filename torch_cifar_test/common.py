@@ -44,17 +44,22 @@ def train():
             acc_cache.append(currect_cate.cpu().item())
         acc_history.append(np.array(acc_cache).mean())
         print(f"Epoch: {epoch}, Accuracy: {np.array(acc_history).mean()}, time_cost: {(time.time()-start_time)*1000} ms")
+        sch.step()
     pl1, = plt.plot(np.arange(len(loss_history)), np.array(loss_history), color='b', linestyle=':')
     pl2, = plt.plot(np.arange(len(acc_history)), np.array(acc_history), color='g')
     plt.legend(handles=[pl1, pl2], labels=['loss', 'acc'], loc='best')
+    x_ticks = np.arange(0, 2.5, 0.25)
+    plt.yticks(x_ticks)
     plt.show()
 
 
 if __name__ == "__main__":
     device = torch.device('cuda')
     model = ResNet([2, 2, 2, 2], 4).to(device)
+    # model = ln(10).to(device)
     print(model)    # 打印类实例
-    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optim = torch.optim.SGD(model.parameters(), lr=1e-2)
+    sch = torch.optim.lr_scheduler.StepLR(optim, step_size=50, last_epoch=-1, gamma=0.1)
     criterion = torch.nn.CrossEntropyLoss()
     train()
 
