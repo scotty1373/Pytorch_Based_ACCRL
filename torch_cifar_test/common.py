@@ -45,6 +45,10 @@ def train():
         acc_history.append(np.array(acc_cache).mean())
         print(f"Epoch: {epoch}, Accuracy: {np.array(acc_history).mean()}, time_cost: {(time.time()-start_time)*1000} ms")
         sch.step()
+
+        # 更新学习率
+        scheduler.step()
+
     pl1, = plt.plot(np.arange(len(loss_history)), np.array(loss_history), color='b', linestyle=':')
     pl2, = plt.plot(np.arange(len(acc_history)), np.array(acc_history), color='g')
     plt.legend(handles=[pl1, pl2], labels=['loss', 'acc'], loc='best')
@@ -54,12 +58,14 @@ def train():
 
 
 if __name__ == "__main__":
-    device = torch.device('cuda')
+    device = torch.device('cpu')
     model = ResNet([2, 2, 2, 2], 4).to(device)
     # model = ln(10).to(device)
     print(model)    # 打印类实例
     optim = torch.optim.SGD(model.parameters(), lr=1e-2)
     sch = torch.optim.lr_scheduler.StepLR(optim, step_size=50, last_epoch=-1, gamma=0.1)
+    # 根据步长变化学习率
+    scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=20, gamma=0.1, last_epoch=-1)
     criterion = torch.nn.CrossEntropyLoss()
     train()
 
