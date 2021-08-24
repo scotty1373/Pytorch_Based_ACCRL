@@ -422,3 +422,23 @@ class ResNet(torch.nn.Module):
         return net
 ```
 
+##### 通过torch.save()保存训练数据（保存数据为字典形式，读取方式也为对应字典形式）
+
+```python
+# 通过torch.save方法保存checkpoints
+torch.save({'epochs': epoch, 'model': net.state_dict(), 'optimizer': optim.state_dict()}, '3in1.pt')
+# 通过torch.load方法读取checkpoints并从dict中读取参数到网络中
+checkpoints = torch.load('3in1.pt')
+checkpoints.keys()
+>>> dict_keys(['epochs', 'model', 'optimizer'])
+# 实例化网络
+model = Data_dim_reduce()
+# 载入参数
+model.load_state_dict(checkpoints['model'])
+>>> <All keys matched successfully>
+# 实例化优化器
+optim = torch.optim.Adam(model.parameters())
+# 载入优化器参数
+optim.load_state_dict(checkpoints['optimizer'])
+```
+
