@@ -66,7 +66,7 @@ if __name__ == "__main__":
     sch = torch.optim.lr_scheduler.StepLR(optim, step_size=50, last_epoch=-1, gamma=0.1)
     # 根据步长变化学习率
     scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=20, gamma=0.1, last_epoch=-1)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss(reduction='mean')
     train()
 
 

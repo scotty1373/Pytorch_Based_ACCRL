@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import torch
 from torch import nn
+import numpy as np
 
 
 class Data_dim_reduce(nn.Module):
@@ -61,6 +62,10 @@ class Data_dim_reduce(nn.Module):
 
 if __name__ == "__main__":
     net = Data_dim_reduce()
+    x = np.random.normal(size=(10, 4, 80, 80))
+    y = np.random.normal(size=(10, 4))
+
+
     epoch = 233
     # 参数保存和读取
     torch.save({'epochs': epoch, 'model': net.state_dict(), 'optimizer': optim.state_dict()}, '3in1.pt')

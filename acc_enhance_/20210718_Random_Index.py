@@ -10,7 +10,6 @@ import time
 from collections import deque
 from net_builder import Data_dim_reduce as build_model
 import numpy as np
-import scipy.io
 import skimage
 import torch
 
@@ -33,15 +32,16 @@ random_index = np.random.permutation(img_channels)
 
 
 class DQNAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, device_):
         self.t = 0
         self.max_Q = 0
         self.trainingLoss = 0
-        self.train = False
+        self.train = True
 
         # Get size of state and action
         self.state_size = state_size
         self.action_size = action_size
+        self.device = device_
 
         # These are hyper parameters for the DQN
         self.discount_factor = 0.99
@@ -61,12 +61,14 @@ class DQNAgent:
         self.memory = deque(maxlen=32000)
 
         # Create main model and target model
-        self.model = build_model()
-        self.target_model = build_model()
+        self.model = build_model().to(self.device)
+        self.target_model = build_model().to(self.device)
 
         # Copy the model to target model
         # --> initialize the target model so that the parameters of model & target model to be same
         self.update_target_model()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        self.loss = torch.nn.SmoothL1Loss(reduction='mean')
 
     def process_image(self, obs):
         obs = skimage.color.rgb2gray(obs)
@@ -105,10 +107,10 @@ class DQNAgent:
         if np.random.rand() <= self.epsilon:
             # print("Return Random Value")
             # return random.randrange(self.action_size)
-            return np.random.uniform(-1,1)
+            return np.random.uniform(-1, 1)
         else:
             # print("Return Max Q Prediction")
-            q_value = self.model.predict(Input)
+            q_value = self.model(Input[0], Input[1])
             # Convert q array to steering value
             return linear_unbin(q_value[0])
 
@@ -124,32 +126,43 @@ class DQNAgent:
 
         batch_size = min(self.batch_size, len(self.memory))
         minibatch = random.sample(self.memory, batch_size)
-
+        '''
+        torch.float64对应torch.DoubleTensor
+        torch.float32对应torch.FloatTensor
+        '''
         state_t, v_ego_t, action_t, reward_t, state_t1, v_ego_t1, terminal, step = zip(*minibatch)
-        state_t = np.concatenate(state_t)
-        state_t1 = np.concatenate(state_t1)
-        v_ego_t = np.concatenate(v_ego_t)
-        v_ego_t1 = np.concatenate(v_ego_t1)
+        state_t = torch.Tensor(state_t).squeeze().to(self.device)
+        state_t1 = torch.Tensor(state_t1).squeeze().to(self.device)
+        v_ego_t = torch.Tensor(v_ego_t).squeeze().to(self.device)
+        v_ego_t1 = torch.Tensor(v_ego_t1).squeeze().to(device)
+
+        self.optimizer.zero_grad()
+
         targets = self.model(state_t, v_ego_t)
-        self.max_Q = np.max(targets[0])
-        target_val = self.model.predict([state_t1, v_ego_t1])
-        target_val_ = self.target_model.predict([state_t1, v_ego_t1])
+        self.max_Q = torch.max(targets[0]).item()
+        target_val = self.model(state_t1, v_ego_t1)
+        target_val_ = self.target_model(state_t1, v_ego_t1)
         for i in range(batch_size):
-            if terminal[i]==1:
+            if terminal[i] == 1:
                 targets[i][action_t[i]] = reward_t[i]
             else:
-                a = np.argmax(target_val[i])
+                a = torch.argmax(target_val[i])
                 targets[i][action_t[i]] = reward_t[i] + self.discount_factor * (target_val_[i][a])
 
-        loss = self.model.train_on_batch([state_t, v_ego_t], targets)
-        self.trainingLoss = loss
+        loss = self.loss(self.model(state_t, v_ego_t), targets)
+        loss.backward()
+        self.optimizer.step()
+        self.trainingLoss = loss.item()
 
     def load_model(self, name):
-        self.model.load_weights(name)
+        checkpoints = torch.load(name)
+        self.model.load_state_dict(checkpoints['model'])
+        self.optimizer.load_state_dict(checkpoints['optimizer'])
 
     # Save the model which is under training
     def save_model(self, name):
-        self.model.save_weights(name)
+        torch.save({'model': self.model.state_dict(),
+                    'optimizer': self.optimizer.state_dict()}, name)
 
 
 def linear_bin(a):
@@ -178,6 +191,7 @@ def linear_unbin(arr):
     --------
     linear_bin
     """
+    arr = arr.data.cpu().numpy()
     if not len(arr) == 21:
         raise ValueError('Illegal array length, must be 21')
     b = np.argmax(arr)
@@ -269,21 +283,15 @@ def print_out(file, text):
 
 # @profile
 def thread_Train_init():
-    global graph_init
-    global agent
-    global sess
-    print('threading!!!')
-    with sess.as_default():         # 调用主函数sess，保证线程内使用的session和graph是同一个
-        step_epsode = 0
-        while True:
-            if len(agent.memory) < agent.train_start:
-                time.sleep(5)
-                continue
-            with graph_init.as_default():
-                agent.train_replay()
-                time.sleep(0.3)
-                step_epsode += 1
-            # print('train complete in num: %s' %str(step_epsode))
+    step_epsode = 0
+    while True:
+        if len(agent.memory) < agent.train_start:
+            time.sleep(5)
+            continue
+        agent.train_replay()
+        time.sleep(0.3)
+        step_epsode += 1
+        # print('train complete in num: %s' %str(step_epsode))
 
 
 def log_File_path(path):
@@ -310,7 +318,7 @@ def Recv_data_Format(byte_size, _done, v_ego=None, action=None, episode_len=None
         image, _, _, gap, v_ego, _, a_ego = decode(revcData)
         x_t = agent.process_image(image)
 
-        s_t = np.stack((x_t,x_t,x_t,x_t),axis=2)
+        s_t = np.stack((x_t, x_t, x_t, x_t), axis=0)
         v_ego_t = np.array((v_ego, v_ego, v_ego, v_ego))
 
         # In Keras, need to reshape
@@ -322,12 +330,12 @@ def Recv_data_Format(byte_size, _done, v_ego=None, action=None, episode_len=None
         image, reward, done, gap, v_ego1, v_lead, a_ego1 = decode(revcData, v_ego, action, episode_len)
 
         x_t1 = agent.process_image(image)
-        x_t1 = x_t1.reshape(1, x_t1.shape[0], x_t1.shape[1], 1) #1x80x80x1
-        s_t1 = np.append(x_t1, s_t[:, :, :, :3], axis=3) #1x80x80x8
-        v_ego_1 = np.array((v_ego1))
+        x_t1 = x_t1.reshape(1, 1, x_t1.shape[0], x_t1.shape[1])     # 1x1x80x80
+        s_t1 = np.append(x_t1, s_t[:, :3, :, :], axis=1)    # 1x4x80x80
+        v_ego_1 = np.array(v_ego1)
         v_ego_1 = np.expand_dims(v_ego_1, -1)
         v_ego_1 = np.expand_dims(v_ego_1, -1)
-        v_ego_t1 = np.append(v_ego_1, v_ego_t[:, :3], axis=1) #1x8
+        v_ego_t1 = np.append(v_ego_1, v_ego_t[:, :3], axis=1)   # 1x4
         return reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1
 
 
@@ -336,6 +344,8 @@ def Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityRes
     pred_time_pre = dt.datetime.now()
     episode_len = episode_len + 1            
     # Get action for the current state and go one step in environment
+    s_t = torch.Tensor(s_t)
+    v_ego_t = torch.Tensor(v_ego_t)
     force = agent.get_action([s_t, v_ego_t])
     action = force
       
@@ -366,31 +376,24 @@ if __name__ == "__main__":
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    # config.gpu_options.per_process_gpu_memory_fraction = 1.0
-    sess = tf.Session(config=config)
-    # Tensorflow1.0
-    K.set_session(sess)
-    # Tensorflow2.0
-    # tensorflow.compat.v1.keras.backend.set_session(sess)
+
+    device = torch.device('cpu')
+
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
     action_size = 21    # env.action_space.n # Steering and Throttle
 
     train_log = log_File_path(PATH_LOG)
     PATH_ = Model_save_Dir(PATH_MODEL, time_Feature)
-    agent = DQNAgent(state_size, action_size)
-    graph_init = tf.get_default_graph()
-    print('graph initlize:', graph_init)
+    agent = DQNAgent(state_size, action_size, device)
     episodes = []
 
     if not agent.train:
         print("Now we load the saved model")
         agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.h5")
-    else:
-        train_thread = threading.Thread(target=thread_Train_init)
-        train_thread.start()
+    # else:
+    #     train_thread = threading.Thread(target=thread_Train_init)
+    #     train_thread.start()
     done = 0
     
     for e in range(EPISODES):      
@@ -423,7 +426,7 @@ if __name__ == "__main__":
             if agent.train:
                 # s_t, v_ego_t, s_t1, v_ego_t1 = random_sample(s_t, v_ego_t, s_t1, v_ego_t1)
                 agent.replay_memory(s_t, v_ego_t, np.argmax(linear_bin(action)), reward, s_t1, v_ego_t1, done)
-                # agent.train_replay()
+                agent.train_replay()
             s_t = s_t1
             v_ego_t = v_ego_t1
             v_ego = v_ego_1
