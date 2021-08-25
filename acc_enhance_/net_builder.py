@@ -9,17 +9,18 @@ class Data_dim_reduce(nn.Module):
         super(Data_dim_reduce, self).__init__()
         self.conv1 = nn.Conv2d(in_channels=4, out_channels=16, kernel_size=(8, 8),
                                stride=(4, 4))
-        self.activation1 = nn.ReLU()
+        self.activation1 = nn.ReLU(inplace=True)
         # 在keras中，通过卷积计算的输出图像如果不为整数，则只取整数部分，相当于留有未卷积的边
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(4, 4),
                                stride=(4, 4), padding=(1, 1))
-        self.activation2 = nn.ReLU()
+        self.activation2 = nn.ReLU(inplace=True)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3),
                                stride=(1, 1), padding=(1, 1))
-        self.activation3 = nn.ReLU()
+        self.activation3 = nn.ReLU(inplace=True)
         self.conv4 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3),
                                stride=(1, 1), padding=(1, 1))
         self.Dense1 = nn.Linear(3200, 128)
+        self.activationDense = nn.ReLU(inplace=True)
         self.Dense2 = nn.Linear(128, 21)
 
         self.inputDense1 = nn.Linear(4, 16)
@@ -50,6 +51,7 @@ class Data_dim_reduce(nn.Module):
         feature = self.conv4(feature)
         feature = torch.flatten(feature, start_dim=1, end_dim=-1)
         feature = self.Dense1(feature)
+        feature = self.activationDense(feature)
         feature = self.Dense2(feature)
 
         velocity = self.inputDense1(x2)

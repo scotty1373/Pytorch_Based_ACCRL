@@ -1,4 +1,5 @@
 import base64
+import copy
 import datetime as dt
 import io
 import os
@@ -68,7 +69,7 @@ class DQNAgent:
         # --> initialize the target model so that the parameters of model & target model to be same
         self.update_target_model()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        self.loss = torch.nn.SmoothL1Loss(reduction='mean')
+        self.loss = torch.nn.MSELoss()
 
     def process_image(self, obs):
         obs = skimage.color.rgb2gray(obs)
@@ -100,7 +101,9 @@ class DQNAgent:
         # return out_img
 
     def update_target_model(self):
-        self.target_model.load_state_dict(self.model.state_dict())
+        # 解决state_dict浅拷贝问题
+        weight_model = copy.deepcopy(self.model.state_dict())
+        self.target_model.load_state_dict(weight_model)
 
     # Get action from model using epsilon-greedy policy
     def get_action(self, Input):
@@ -148,8 +151,8 @@ class DQNAgent:
             else:
                 a = torch.argmax(target_val[i])
                 targets[i][action_t[i]] = reward_t[i] + self.discount_factor * (target_val_[i][a])
-
-        loss = self.loss(self.model(state_t, v_ego_t), targets)
+        logits = self.model(state_t, v_ego_t)
+        loss = self.loss(logits, targets)
         loss.backward()
         self.optimizer.step()
         self.trainingLoss = loss.item()
@@ -211,7 +214,7 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     img = base64.b64decode(revcList[4])      # image from mainCamera
     image = Image.open(io.BytesIO(img))
     # image resize, 双线性插值
-    image = image.resize((80,80), resample=Image.BILINEAR)
+    image = image.resize((80, 80), resample=Image.BILINEAR)
     image = np.array(image)
     done = 0
     reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
@@ -344,8 +347,8 @@ def Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityRes
     pred_time_pre = dt.datetime.now()
     episode_len = episode_len + 1            
     # Get action for the current state and go one step in environment
-    s_t = torch.Tensor(s_t)
-    v_ego_t = torch.Tensor(v_ego_t)
+    s_t = torch.Tensor(s_t).to(device)
+    v_ego_t = torch.Tensor(v_ego_t).to(device)
     force = agent.get_action([s_t, v_ego_t])
     action = force
       
@@ -377,7 +380,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cpu')
+    device = torch.device('cuda')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -427,10 +430,12 @@ if __name__ == "__main__":
                 # s_t, v_ego_t, s_t1, v_ego_t1 = random_sample(s_t, v_ego_t, s_t1, v_ego_t1)
                 agent.replay_memory(s_t, v_ego_t, np.argmax(linear_bin(action)), reward, s_t1, v_ego_t1, done)
                 agent.train_replay()
+
             s_t = s_t1
             v_ego_t = v_ego_t1
             v_ego = v_ego_1
             agent.t = agent.t + 1
+
             print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", reward, "Avg REWARD:",
                     sum(rewardTot)/len(rewardTot) , "/ EPISODE LENGTH", episode_len, "/ Q_MAX " ,
                     agent.max_Q, "/ time " , time_cost, a_ego1)
