@@ -390,7 +390,7 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.h5")
+        agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt")
     # else:
     #     train_thread = threading.Thread(target=thread_Train_init)
     #     train_thread.start()
