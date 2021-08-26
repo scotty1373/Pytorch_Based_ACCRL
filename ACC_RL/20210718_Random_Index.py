@@ -287,6 +287,7 @@ def print_out(file, text):
 
 # @profile
 def thread_Train_init():
+    global agent
     step_epsode = 0
     while True:
         if len(agent.memory) < agent.train_start:
@@ -381,7 +382,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -395,9 +396,10 @@ if __name__ == "__main__":
     if not agent.train:
         print("Now we load the saved model")
         agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt")
-    # else:
-    #     train_thread = threading.Thread(target=thread_Train_init)
-    #     train_thread.start()
+    else:
+        train_thread = threading.Thread(target=thread_Train_init)
+        train_thread.start()
+        print('Thread Ready!!!')
     done = 0
     
     for e in range(EPISODES):      
@@ -430,7 +432,6 @@ if __name__ == "__main__":
             if agent.train:
                 # s_t, v_ego_t, s_t1, v_ego_t1 = random_sample(s_t, v_ego_t, s_t1, v_ego_t1)
                 agent.replay_memory(s_t, v_ego_t, np.argmax(linear_bin(action)), reward, s_t1, v_ego_t1, done)
-                agent.train_replay()
 
             s_t = s_t1
             v_ego_t = v_ego_t1

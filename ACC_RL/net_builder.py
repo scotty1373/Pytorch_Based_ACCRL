@@ -40,6 +40,7 @@ class Data_dim_reduce(nn.Module):
         #                                     nn.ReLU(True),
         #                                     nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3),
         #                                               stride=(1, 1), padding=(1, 1)))
+        print('Model we built ready!!!')
 
     def forward(self, x1, x2):
         feature = self.conv1(x1)
