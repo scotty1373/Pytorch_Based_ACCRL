@@ -1,6 +1,6 @@
 # Pytorch API学习及逻辑调用
 
-tensor.item()
+##### tensor.item()
 
 ```python
 # 对tensor取数值，返回张量元素的值，对于tensor内有一个数值才可调用此方法，多个元素报错
@@ -9,7 +9,7 @@ tensor.item()
 tensor.numpy()
 ```
 
-tensor.eq()
+##### tensor.eq()
 
 ```python
 # tensor.eq()方法等同于tf.equal(),都是对tensor内的数据按元素对比（指定dim、axis），并且输出对应dim的布尔类型数据
@@ -20,21 +20,21 @@ torch.equal(tensor_a, tensor_b)	# --> _bool:
 tensor_a.equal(tensor_b)
 ```
 
-tensor.numel()
+##### tensor.numel()
 
 ```python
 # tensor.numel()方法返回tensor占用内存大小
 tensor_a.numel()
 ```
 
-torch.set_default_tensor_type(torch.FloatTensor/torch.DoubleTensor)
+##### torch.set_default_tensor_type(torch.FloatTensor/torch.DoubleTensor)
 
 ```python
 # torch.set_default_tensor_type()设定torch.Tensor()默认格式（如果不设置默认为FLostTensor）
 torch.set_default_tensor_type()
 ```
 
-torch.full([shape], num)
+##### torch.full([shape], num)
 
 ```python
 # tensor.full()方法生成一个给定shape的全num型数组，给定输入需要是float不能是int
@@ -45,7 +45,7 @@ tensor([[5.3000, 5.3000, 5.3000],
         [5.3000, 5.3000, 5.3000]])
 ```
 
-torch.linspace(start, end, steps=None)
+##### torch.linspace(start, end, steps=None)
 
 ```python
 # torch.linspace(start, end, steps=None)方法生成等分的数组
@@ -55,7 +55,7 @@ tensor([0.0000, 0.3333, 0.6667, 1.0000, 1.3333, 1.6667, 2.0000, 2.3333, 2.6667,
         3.0000])
 ```
 
-torch.logspace(start, end, steps=None)
+##### torch.logspace(start, end, steps=None)
 
 ```python
 # torch.logspace(start: Number, end: Number, steps: _int=100, base: _float=10.0)生成以base为底的指数等分数组
@@ -65,7 +65,7 @@ tensor([1.0000, 1.0801, 1.1665, 1.2599, 1.3608, 1.4697, 1.5874, 1.7145, 1.8517,
         2.0000])
 ```
 
-torch.randperm(Number)
+##### torch.randperm(Number)
 
 ```python
 # randperm(Number)生成基于number大小的随机乱序数，相当于np.random.permutation(),用于数据维度shuffle
@@ -74,7 +74,7 @@ x
 tensor([3, 6, 7, 5, 9, 2, 4, 0, 8, 1])
 ```
 
-tensor[0, :, :, :]切片
+##### tensor[0, :, :, :]切片
 
 ```python
 tensor[0, :, :, :] <=> tensor[0, ...]
@@ -82,14 +82,14 @@ tensor[...] <=> tensor[:, :, :, :]
 tensor[..., :2] <=> tensor[:, :, :, :2]
 ```
 
-tensor.view()和tensor.reshape()
+##### tensor.view()和tensor.reshape()
 
 ```python
 # 在pytorch0.3之前都是使用view函数对数组进行维度变换，但在0.4版本中为了保持与numpy一致，增加了reshape函数,两种函数用法完全相同
 tensor_a.view(3, 3) <=> tensor_a.reshape(3,3)
 ```
 
-tensor.unsqueeze()
+##### tensor.unsqueeze()
 
 ```python
 # dim -> 0   1   2   3
@@ -101,7 +101,7 @@ y.shape
 torch.Size([2, 1, 3, 28, 28])
 ```
 
-torch.cat([tensor_a, tensor_b], dim=Number)
+##### torch.cat([tensor_a, tensor_b], dim=Number)
 
 ```python
 # cat方法与tf.concat(), np.concatante()用法一致都用于在原有维度上进行拼接，不会增加维度
@@ -118,7 +118,7 @@ torch.cat([x, y], dim=0).shape
 -> torch.Size([2, 3, 3])
 ```
 
-torch.stack([tensor_a, tensor], dim=Number)  
+##### torch.stack([tensor_a, tensor], dim=Number)  
 
 ```python
 # stack方法与tf.stack(),np.stack()用法一致，用于将两个张量在一个新的维度拼接，会增加维度
@@ -132,7 +132,7 @@ torch.stack([x, y], dim=0).shape
 -> torch.Size([2, 1, 3, 3])
 ```
 
-tensor.split(Number, dim=Number)
+##### tensor.split(Number, dim=Number)
 
 ```python
 # 方法按照给定dim将原张量按指定维度拆分成指定长度tensor，与tf.split()用法相同
@@ -160,7 +160,7 @@ tensor([[[0.1732, 0.1510, 0.9870],
 
 ```
 
-tensor.chunk(num, dim=num)
+##### tensor.chunk(num, dim=num)
 
 ```python
 # 方法将原tensor按维度以给定数量拆分
@@ -172,7 +172,7 @@ b.shape
 -> torch.Size([3, 3, 3])
 ```
 
-tensor.expand()
+##### tensor.expand()
 
 ```python
 # expand只能把维度为1的拓展成指定维度。如果哪个维度为-1，就是该维度不变
@@ -184,7 +184,7 @@ x.expand(4, 4, 2, 6).shape
 
 ```
 
-tensor.repeat()
+##### tensor.repeat()
 
 ```python
 # torch.repeat()里面参数代表是重复多少次，就是复制多少次，比如下面2， 3， 1， 6代表复制2， 3， 1， 6次
@@ -194,7 +194,7 @@ x.repeat(2, 3, 1, 6).shape
 torch.Size([2, 12, 1, 6])
 ```
 
-tensor.t()
+##### tensor.t()
 
 ```python
 # tensor.t()只能用于二维转置
@@ -207,7 +207,7 @@ x.t().shape
 torch.Size([3, 4])
 ```
 
-tensor.transpose(dim=Number, dim=Number)
+##### tensor.transpose(dim=Number, dim=Number)
 
 ```python
 # transpose用于维度转换，但需要借助contiguous来复制内存从而不被原始数据混淆
@@ -259,7 +259,7 @@ torch.Size([1, 4, 3, 2])
 
 ```
 
-torch.permute()
+##### torch.permute()
 
 ```python
 # permute和transpose都可以进行维度交换，但permute在高维的功能性更强
@@ -278,7 +278,7 @@ tensor([[[[0.4613, 0.2058, 0.1494, 0.4891],
 
 
 
-Broadcasting广播机制
+##### Broadcasting广播机制
 
 ```python
 # 广播机制表示当维度不统一时，相当于unsqueeze去插入新的维度，并且用expand在已存在维度上复制数据
@@ -299,7 +299,7 @@ x + y
 
 
 
-torch.nn.init.kaiming_normal_(tensor)
+##### torch.nn.init.kaiming_normal_(tensor)
 
 ```python
 '''
@@ -309,7 +309,7 @@ x = torch.rand((200, 784))
 torch.nn.init.kaiming_normal_(x)
 ```
 
-nn.ReLu 与 F.relu()区别
+##### nn.ReLu 与 F.relu()区别
 
 ```python
 '''
@@ -442,3 +442,16 @@ optim = torch.optim.Adam(model.parameters())
 optim.load_state_dict(checkpoints['optimizer'])
 ```
 
+pytorch中clone和detach
+
+```
+
+```
+
+pytorch中optimizer.step(), loss.backward()以及optimizer.zero()代码关系
+
+```
+
+```
+
+pytorch 0.4版本中后Variable和Tensor合并之后的关系
