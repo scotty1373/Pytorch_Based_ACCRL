@@ -13,6 +13,7 @@ from net_builder import Data_dim_reduce as build_model
 import numpy as np
 import skimage
 import torch
+from torch.autograd import Variable
 
 from PIL import Image
 from skimage import color, exposure, transform
@@ -68,7 +69,7 @@ class DQNAgent:
         # Copy the model to target model
         # --> initialize the target model so that the parameters of model & target model to be same
         self.update_target_model()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         self.loss = torch.nn.MSELoss()
 
     def process_image(self, obs):
@@ -134,10 +135,10 @@ class DQNAgent:
         torch.float32对应torch.FloatTensor
         '''
         state_t, v_ego_t, action_t, reward_t, state_t1, v_ego_t1, terminal, step = zip(*minibatch)
-        state_t = torch.Tensor(state_t).squeeze().to(self.device)
-        state_t1 = torch.Tensor(state_t1).squeeze().to(self.device)
-        v_ego_t = torch.Tensor(v_ego_t).squeeze().to(self.device)
-        v_ego_t1 = torch.Tensor(v_ego_t1).squeeze().to(device)
+        state_t = Variable(torch.Tensor(state_t).squeeze().to(self.device))
+        state_t1 = Variable(torch.Tensor(state_t1).squeeze().to(self.device))
+        v_ego_t = Variable(torch.Tensor(v_ego_t).squeeze().to(self.device))
+        v_ego_t1 = Variable(torch.Tensor(v_ego_t1).squeeze().to(device))
 
         self.optimizer.zero_grad()
 
