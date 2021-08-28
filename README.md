@@ -442,16 +442,69 @@ optim = torch.optim.Adam(model.parameters())
 optim.load_state_dict(checkpoints['optimizer'])
 ```
 
-pytorch中clone和detach
+##### pytorch中clone和detach对数据的影响
 
 ```
 
 ```
 
-pytorch中optimizer.step(), loss.backward()以及optimizer.zero()代码关系
+##### pytorch中自定义卷积权重
+
+```python
+'''
+今天在用pytorch做多通道卷积举例的时候需要对卷积核里的参数进行自定义，发现pytorch可以通过实例化的调用直接更改权重，以下为代码示例
+需要注意的一点是，当生成了和给定卷积权重相同shape的权重后，直接应用conv.weight = custom_weight是不行的，因为conv.weight限制了赋值变量类型，
+变量类型也需要满足Parameter的数据类型，需要通过torch.nn.Parameter(custom_weight)改变数据类型
+
+pytorch中torch.FloatTensor对应tensorflow中的tf.float32,
+		torch.LongTensor对应tensorflow中的tf.float64
+'''
+# -*- coding: utf-8 -*-
+import torch
+import numpy
+
+x = torch.arange(0, 9).reshape(3, 3)
+y = torch.arange(1, 10).reshape(3, 3)
+
+# 定义多通道输入数组大小
+input_array = torch.stack((x, y), dim=0)
+input_array = input_array.unsqueeze(dim=0)
+# noinspection PyTypeChecker
+input_array = input_array.type(torch.FloatTensor)
+print(f'输入卷积的数组大小：{input_array.shape}')
+
+# 实例化卷积方法， 禁用bias方便后续手算卷积
+conv = torch.nn.Conv2d(in_channels=2, out_channels=1, kernel_size=2, padding=0, stride=1, bias=False)
+
+# 定义卷积权重weight
+w = torch.arange(0, 4).reshape(2, 2)
+w1 = torch.arange(1, 5).reshape(2, 2)
+w = torch.stack((w, w1), dim=0)
+w = w.unsqueeze(dim=0)
+# noinspection PyTypeChecker
+w = w.type(torch.FloatTensor)
+print(f'卷积权重形状(shape): {w.shape}')
+
+# 将我们自定义的卷积权重应用于conv方法
+print(f'从nn类中实例化出来的Conv2D初始化参数为： {conv.weight}')
+conv.weight = torch.nn.parameter.Parameter(w)
+print(f'应用自定义权重之后的Conv2D参数为： {conv.weight}')
+# 用以下方法自定义卷积权重一样可以，两个方法指向的代码相同
+# conv.weight = torch.nn.Parameter(w)
+
+out = conv(input_array)
+print(out)
+```
+
+pytorch中optimizer.step(), loss.backward()以及optimizer.zero_grad()代码关系
 
 ```
 
 ```
 
 pytorch 0.4版本中后Variable和Tensor合并之后的关系
+
+```
+
+```
+
