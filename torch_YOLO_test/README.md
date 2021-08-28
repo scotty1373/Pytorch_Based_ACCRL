@@ -2,7 +2,7 @@
 
 本项目使用
 
-[https://github.com/ultralytics/yolov5]: ultralytics/yolov5
+[ultralytics/yolov5]: https://github.com/ultralytics/yolov5
 
 存储库，进行目标检测训练。
 
