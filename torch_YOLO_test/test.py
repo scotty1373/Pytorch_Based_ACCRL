@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import torch
 torch.hub.set_dir('./')
@@ -15,14 +16,31 @@ def xyxy2xywh(x):
     return y
 
 
+def xyxy2xyxy(x):
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = int(x[:, 0])
+    y[:, 1] = int(x[:, 1])
+    y[:, 2] = int(x[:, 2])
+    y[:, 3] = int(x[:, 3])
+    return y
+
 result = model('./zidane.jpg')
 
 data = {}
 
-# 使用字典存储锚框信息
+# 使用字典存储锚框信息, xyhw modeul
+# for index, x in enumerate(result.pred):
+#     auchor = np.zeros((1, len(result.pred[index]), 5))
+#     auchor_num = len(result.pred[index])
+#     auchor[0, :, :4] = xyxy2xywh(x)[:, :4]
+#     auchor[0, :, 4] = x[:, 5]
+#     data[f'auchor{index}'] = auchor
+
+# xyxy module
 for index, x in enumerate(result.pred):
     auchor = np.zeros((1, len(result.pred[index]), 5))
     auchor_num = len(result.pred[index])
+
     auchor[0, :, :4] = xyxy2xywh(x)[:, :4]
     auchor[0, :, 4] = x[:, 5]
     data[f'auchor{index}'] = auchor

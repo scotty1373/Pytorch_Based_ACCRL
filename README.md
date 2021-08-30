@@ -444,8 +444,17 @@ optim.load_state_dict(checkpoints['optimizer'])
 
 ##### pytorch中clone和detach对数据的影响
 
-```
+```python
+'''
+前几天在做DDQN代码移植的时候碰到一个问题，DDQN需要在迭代更新参数的过程中将参与训练的模型参数复制给用来减小自举影响的target模型，在复制的过程中，如果单纯的将target_model.state_dict(model.state_dict())通过这种方式赋值给target网络，由于.state_dict()方法的特殊性，导致target_model与model共享内存，从而使得DDQN自举过度，训练无法收敛；
+所以考虑了deepcopy取state_dict的值，可以避免发生这种错误.
 
+今天在做yolo锚框的时候觉得可以使用另一种方法来解决这种问题
+tensor.detach()用作将tensor与原计算图分离，内存位置仍然指向原tensor位置，但是require_grad置为Flase，也就意味着这个tensor不计算梯度，不具有grad
+tensor.clone()用作将原tensor内容复制到新内存空间，保留新tensor的grad回溯
+
+将此方法应用于之前参数复制问题上，实际可以通过model.state_dict.detach().clone()复制权重参数
+'''
 ```
 
 ##### pytorch中自定义卷积权重
@@ -496,13 +505,19 @@ out = conv(input_array)
 print(out)
 ```
 
-pytorch中optimizer.step(), loss.backward()以及optimizer.zero_grad()代码关系
+##### pytorch中optimizer.step(), loss.backward()以及optimizer.zero_grad()代码关系
 
 ```
 
 ```
 
-pytorch 0.4版本中后Variable和Tensor合并之后的关系
+##### pytorch 0.4版本中后Variable和Tensor合并之后的关系
+
+```
+
+```
+
+##### YOLOv5 调用.show()方法后会在原图上叠加预测锚框
 
 ```
 
