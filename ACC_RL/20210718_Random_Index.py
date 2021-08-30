@@ -17,6 +17,7 @@ from torch.autograd import Variable
 
 from PIL import Image
 from skimage import color, exposure, transform
+import cv2
 
 
 EPISODES = 500
@@ -169,6 +170,27 @@ class DQNAgent:
                     'optimizer': self.optimizer.state_dict()}, name)
 
 
+# 单目标斜对角坐标
+def xyxy2xywh(x):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
+    y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center
+    y[:, 2] = x[:, 2] - x[:, 0]  # width
+    y[:, 3] = x[:, 3] - x[:, 1]  # height
+    return y
+
+
+def xyxy2xyxy(x):
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = x[:, 0]
+    y[:, 1] = x[:, 1]
+    y[:, 2] = x[:, 2]
+    y[:, 3] = x[:, 3]
+    y = y.type(torch.IntTensor)
+    return y
+
+
 def linear_bin(a):
     """
     Convert a value to a categorical array.
@@ -215,8 +237,20 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     img = base64.b64decode(revcList[4])      # image from mainCamera
     image = Image.open(io.BytesIO(img))
     # image resize, 双线性插值
-    image = image.resize((80, 80), resample=Image.BILINEAR)
     image = np.array(image)
+
+    anchor_box = yolo(image)
+    # !!!后期可能会出现问题（问题具体出现在锚框不准确的问题）!!!
+    # 后期优化方向，取置信度最大的锚框index作为锚框选取坐标
+    # index = anchor_box.pred[0][0, 4]
+
+    # 当前代码问题，yolo输出锚框为1时选取锚框问题，暂时解决通过取消squeeze
+    # !!!锚框缺失问题!!!
+    position = np.array(xyxy2xyxy(anchor_box.pred[0]), dtype='uint8')
+    if position.shape[0] != 0:
+        image = cv2.rectangle(image, (position[0, 0], position[0, 1]), (position[0, 2], position[0, 3]), (0, 255, 0), 2)
+    image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_LINEAR)
+
     done = 0
     reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
     if float(gap) <= 3 or float(gap) >= 300:
@@ -401,7 +435,11 @@ if __name__ == "__main__":
         train_thread.start()
         print('Thread Ready!!!')
     done = 0
-    
+
+    # 增加yolo目标检测算法支持
+    torch.hub.set_dir('./')
+    yolo = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+
     for e in range(EPISODES):      
         print("Episode: ", e)
         # Multi Thread
