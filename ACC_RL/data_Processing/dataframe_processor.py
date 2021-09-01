@@ -66,7 +66,7 @@ def plot_action_reward_gap_v_(EPISODE, ACTION, gap, v_ego, v_lead):
         gap_mean.append(np.array(gap[start_index:end_index].mean()))
         action_mean.append(np.array(ACTION[start_index:end_index].mean()))
     fig, ax1 = plt.subplots(figsize=(10, 3))
-    title = ('acc_info')
+    title = 'acc_info'
     plt.title(title, fontsize=20)
     # plt.grid(axis='y',color='grey',linestyle='--',lw=0.5,alpha=0.5)
     # plt.tick_params(axis='both',labelsize=14)
@@ -158,11 +158,12 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
                                                                          _v_lead, _v_ego, _gap,
                                                                          ACTION_, REWARD_, index_-1)
     # Plot val in graph
-    plt.subplot(411)
-    v_lead_g, = plt.plot(length_ep, v_lead_, linewidth=2, color='C1')
-    v_ego_g, = plt.plot(length_ep, v_ego_, linewidth=2, color='C9')
-    gap_g, = plt.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
-    
+    ax_a_g = plt.subplot(411)
+    ax_a_v = ax_a_g.twinx()
+    v_lead_g, = ax_a_v.plot(length_ep, v_lead_, linewidth=2, color='C1')
+    v_ego_g, = ax_a_v.plot(length_ep, v_ego_, linewidth=2, color='C9')
+    gap_g, = ax_a_g.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
+
     plt.legend(handles=[v_lead_g, v_ego_g, gap_g],
                labels=['v_lead', 'v_ego', 'gap'], loc=2)
     plt.title('info_{}'.format(index_-1))
@@ -182,10 +183,11 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
                                                                          EPISODE_LENGTH_, _v_lead, _v_ego,
                                                                          _gap, ACTION_, REWARD_, index_)
     # Plot val in graph
-    plt.subplot(413)
-    v_lead_g, = plt.plot(length_ep, v_lead_, linewidth=2, color='C1')
-    v_ego_g, = plt.plot(length_ep, v_ego_, linewidth=2, color='C9')
-    gap_g, = plt.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
+    ax_b_g = plt.subplot(413)
+    ax_b_v = ax_b_g.twinx()
+    v_lead_g, = ax_b_v.plot(length_ep, v_lead_, linewidth=2, color='C1')
+    v_ego_g, = ax_b_v.plot(length_ep, v_ego_, linewidth=2, color='C9')
+    gap_g, = ax_b_g.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
     plt.legend(handles=[v_lead_g, v_ego_g, gap_g],
                labels=['v_lead', 'v_ego', 'gap'], loc=2)
     plt.title('info_{}'.format(index_))

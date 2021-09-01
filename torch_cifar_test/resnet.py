@@ -26,7 +26,7 @@ class ResBlock(torch.nn.Module):
         # 如果输入输出channel不匹配
         if self.Conv3:
             input_ = self.Conv3(input_)
-        return torch.nn.functional.relu(fx + input_)
+        return torch.nn.functional.relu(fx + input_)    # 张量直接相加，不改变维度->128*14*14相加之后维度依然为128*14*14
 
 
 class ResNet(torch.nn.Module):

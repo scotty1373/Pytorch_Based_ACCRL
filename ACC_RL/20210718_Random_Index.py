@@ -336,7 +336,7 @@ def thread_Train_init():
 def log_File_path(path):
     # date = str(dt.date.today()).split('-')
     # date_concat = date[1] + date[2]
-    date_concat = round(time.time())
+    date_concat = time_Feature
     train_log = open(os.path.join(path, 'train_log_{}.txt'.format(date_concat)), 'w')
     del date_concat
     return train_log
