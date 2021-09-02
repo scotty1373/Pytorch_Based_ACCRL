@@ -249,7 +249,8 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     position = np.array(xyxy2xyxy(anchor_box.pred[0]), dtype='uint8')
     if position.shape[0] != 0:
         image = cv2.rectangle(image, (position[0, 0], position[0, 1]), (position[0, 2], position[0, 3]), (0, 255, 0), 2)
-    image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_LINEAR)
+    # 更改双线性插值为区域插值，图像处理完效果好于双线性插值
+    image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_AREA)
 
     done = 0
     reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
@@ -416,7 +417,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
