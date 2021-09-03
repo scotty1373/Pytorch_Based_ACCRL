@@ -252,7 +252,7 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     if position.shape[0] != 0:
         ImageDraw.Draw(image).rectangle([(position[0, 0], position[0, 1]), (position[0, 2], position[0, 3])], outline='yellow', width=3)
     image = image.resize((80, 80), resample=Image.BILINEAR)
-
+    image = np.array(image)
     '''
     opencv支持
 
