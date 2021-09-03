@@ -15,7 +15,7 @@ import skimage
 import torch
 from torch.autograd import Variable
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from skimage import color, exposure, transform
 import cv2
 
@@ -237,9 +237,9 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     img = base64.b64decode(revcList[4])      # image from mainCamera
     image = Image.open(io.BytesIO(img))
     # image resize, 双线性插值
-    image = np.array(image)
+    images = np.array(image)
 
-    anchor_box = yolo(image)
+    anchor_box = yolo(images)
     # !!!后期可能会出现问题（问题具体出现在锚框不准确的问题）!!!
     # 后期优化方向，取置信度最大的锚框index作为锚框选取坐标
     # index = anchor_box.pred[0][0, 4]
@@ -247,11 +247,20 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
     # 当前代码问题，yolo输出锚框为1时选取锚框问题，暂时解决通过取消squeeze
     # !!!锚框缺失问题!!!
     position = np.array(xyxy2xyxy(anchor_box.pred[0]), dtype='uint8')
+
+    # pillow 支持
+    if position.shape[0] != 0:
+        ImageDraw.Draw(image).rectangle([(position[0, 0], position[0, 1]), (position[0, 2], position[0, 3])], outline='yellow', width=3)
+    image = image.resize((80, 80), resample=Image.BILINEAR)
+
+    '''
+    opencv支持
+
     if position.shape[0] != 0:
         image = cv2.rectangle(image, (position[0, 0], position[0, 1]), (position[0, 2], position[0, 3]), (0, 255, 0), 2)
     # 更改双线性插值为区域插值，图像处理完效果好于双线性插值
     image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_AREA)
-
+    '''
     done = 0
     reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
     if float(gap) <= 3 or float(gap) >= 300:

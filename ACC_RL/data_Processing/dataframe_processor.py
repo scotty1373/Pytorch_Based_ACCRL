@@ -12,7 +12,7 @@ import datetime as dt
 
 # test sele
 MENU = 'graph'
-FILE_PATH = 'train_log_1629914171.txt'
+FILE_PATH = 'train_log_1630487505.txt'
 Timestamp = time.time()
 
 date = str(dt.date.today)[1] + str(dt.date.today)[2]
