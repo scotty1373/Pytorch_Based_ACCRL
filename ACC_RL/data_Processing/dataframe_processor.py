@@ -5,6 +5,10 @@ import time
 import os
 import matplotlib.pyplot as plt
 import datetime as dt
+from numpy import seterr
+
+seterr(all='raise')
+np.set_printoptions(suppress=True, threshold=10000, linewidth=1000)
 
 # vaild sele
 # MENU = sys.argv[1]
@@ -182,10 +186,24 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
     length_ep, v_lead_, v_ego_, gap_, action_, reward_ = get_singal_info(EPISODE_,
                                                                          EPISODE_LENGTH_, _v_lead, _v_ego,
                                                                          _gap, ACTION_, REWARD_, index_)
+    # 制作数据，处理数据 >>>
+    v_relative = (v_ego_[:, 0] - v_lead_[:, 0]).reshape(-1, 1)
+    acc_relative = np.zeros((len(length_ep), 1))
+    for index in range(1, len(length_ep)):
+        try:
+            acc_relative[index, :] = (v_relative[index, :]**2 - v_relative[index - 1, :]**2) / (2 * (gap_[index, :] - gap_[index-1, :]))
+        except FloatingPointError as e:     # numpy将所有0/0错误归于FloatingPointError，第十行定义numpy抛出所有警告类型为错误，即可捕获RunTimeWarning
+            print(f"index {index} gap has no change")
+            acc_relative[index, :] = 0
+    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, v_relative, acc_relative], axis=1))
+
+    # 制作数据，处理数据 <<<
+
     # Plot val in graph
     ax_b_g = plt.subplot(413)
     ax_b_v = ax_b_g.twinx()
     v_lead_g, = ax_b_v.plot(length_ep, v_lead_, linewidth=2, color='C1')
+    v_re, = ax_b_v.plot(length_ep, v_relative)
     v_ego_g, = ax_b_v.plot(length_ep, v_ego_, linewidth=2, color='C9')
     gap_g, = ax_b_g.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
     plt.legend(handles=[v_lead_g, v_ego_g, gap_g],
@@ -201,7 +219,44 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
                labels=['action', 'reward'], loc=2)
     
     plt.show()
-    
+
+
+def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_, index_):
+    length_ep, v_lead_, v_ego_, gap_, action_, reward_ = get_singal_info(EPISODE_, EPISODE_LENGTH_,
+                                                                         _v_lead, _v_ego, _gap,
+                                                                         ACTION_, REWARD_, index_-1)
+
+    acc_lead_ = np.zeros(((len(length_ep)), 1))
+    acc_ego_ = np.zeros(((len(length_ep)), 1))
+
+    acc_lead_[1:, :] = (v_lead_[1:, :] - v_lead_[:-1, :]) / 0.5
+    acc_ego_[1:, :] = (v_ego_[1:, :] - v_ego_[:-1, :]) / 0.5
+    acc_compare = acc_ego_ - acc_lead_
+
+    # 制作数据，处理数据 >>>
+    v_relative = (v_ego_[:, 0] - v_lead_[:, 0]).reshape(-1, 1)
+    gap_relative = np.zeros((len(length_ep), 1))
+    gap_relative[1:, :] = (gap_[1:, 0] - gap_[:-1, 0]).reshape(-1, 1)
+    acc_relative = np.zeros((len(length_ep), 1))
+    for index in range(1, len(length_ep)):
+        try:
+            acc_relative[index, :] = (v_relative[index, :]**2 - v_relative[index - 1, :]**2) / (2 * (gap_[index, :] - gap_[index-1, :]))
+        except FloatingPointError as e:     # numpy将所有0/0错误归于FloatingPointError，第十行定义numpy抛出所有警告类型为错误，即可捕获RunTimeWarning
+            print(f"index {index} gap has no change")
+            acc_relative[index, :] = 0
+    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, v_relative, acc_relative, acc_compare], axis=1))
+
+    # 制作数据，处理数据 <<<
+    fig, axis = plt.subplots()
+    axis2 = axis.twinx()
+    v_rel, = axis2.plot(length_ep, v_relative, linewidth=2, color='C1')
+    gap_rel, = axis.plot(length_ep, gap_relative, linestyle='-', color='C3')
+    acc_rel, = axis2.plot(length_ep, acc_compare, linewidth=2, color='C9')
+    # gap_g, = ax_b_g.plot(length_ep, gap_, linewidth=2, color='C3', linestyle=':')
+    plt.legend(handles=[v_rel, gap_rel, acc_rel],
+               labels=['v_rel', 'gap_rel', 'acc_rel'], loc='best')
+    plt.show()
+
 
 if __name__ == '__main__':
     if MENU == 'proc':
@@ -228,11 +283,12 @@ if __name__ == '__main__':
         time = np.array(df.iloc[0:row, 12:13], dtype=float)
         a_ego = np.array(df.iloc[0:row, 13:14], dtype=float)
         # plot graph
-        plot_action_reward_gap_v_(EPISODE, ACTION, gap, v_ego, v_lead)
-        plot_Qmax_singel_timeframe(Q_MAX, TIMESTAMP)
-        indexOfcrash, indexoflose = plot_reward_action_crash(EPISODE, ACTION, gap, EPISODE_LENGTH)
+        # plot_action_reward_gap_v_(EPISODE, ACTION, gap, v_ego, v_lead)
+        # plot_Qmax_singel_timeframe(Q_MAX, TIMESTAMP)
+        # indexOfcrash, indexoflose = plot_reward_action_crash(EPISODE, ACTION, gap, EPISODE_LENGTH)
         while True:
             crash_index = input('Enter the crash index you want to view: ')
-            plot_singal_info(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
+            # plot_singal_info(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
+            relative(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
 
 
