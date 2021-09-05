@@ -447,7 +447,7 @@ optim.load_state_dict(checkpoints['optimizer'])
 ```python
 '''
 前几天在做DDQN代码移植的时候碰到一个问题，DDQN需要在迭代更新参数的过程中将参与训练的模型参数复制给用来减小自举影响的target模型，在复制的过程中，如果单纯的将target_model.state_dict(model.state_dict())通过这种方式赋值给target网络，由于.state_dict()方法的特殊性，导致target_model与model共享内存，从而使得DDQN自举过度，训练无法收敛；
-所以考虑了deepcopy取state_dict的值，可以避免发生这种错误.
+所以考虑了deepcopy取state_dict的值，可以避免发生这种错误
 
 今天在做yolo锚框的时候觉得可以使用另一种方法来解决这种问题
 tensor.detach()用作将tensor与原计算图分离，内存位置仍然指向原tensor位置，但是require_grad置为Flase，也就意味着这个tensor不计算梯度，不具有grad
@@ -503,6 +503,42 @@ print(f'应用自定义权重之后的Conv2D参数为： {conv.weight}')
 
 out = conv(input_array)
 print(out)
+```
+
+##### Keras卷积padding为‘SAME’和‘VALID’时，对应Pytorch的padding方式
+
+```python
+'''
+# 实际卷积中，tensorflow和pytorch中给的padding凡是有确切数值的，padding都只代表一边的padding像素数
+# keras卷积计算输出
+# Valid
+# 输出大小 = （输入大小 - kernal_size + strides）/ strides
+# SAME
+# 输出大小 =  输入大小 / strides
+
+#Pytoch计算卷积输出
+# 输出大小 = (输入大小 - kernal_size + padding*2 + strides) / strides
+
+# 可以看出keras会自动平衡“(输入大小 - kernal_size + padding*2 + strides)”这一部分的大小，使其与原输入大小相同，
+# 即，使得“kernal_size - padding*2 - strides”计算结果为0
+'''
+
+# 试验pytorch和keras相同输出
+# keras喂入数据(需要满足tensorflow数据格式，即通道在最后一维)
+x = np.random.normal(size=(1, 32, 32, 3))
+# 在keras和Pytorch中，通过卷积计算的输出图像如果不为整数，则只取整数部分，相当于留有未卷积的边
+conv2_keras = tf.keras.layers.Conv2d(16, (4, 4), padding="same", strides=(4, 4), input_shape=(3, 32, 32))
+cone2_keras(x).shape
+>>>TensorShape([1, 8, 8, 16])
+
+# Pytorch
+# 喂入数据满足caffe数据格式，通道数在dim=1位置
+x = torch.rand((1, 3, 32, 32))
+conv2_torch = torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(4, 4), stride=(4, 4), padding=(0, 0))
+conv2_torch(x).shape
+>>>torch.Size([1, 16, 8, 8])
+
+# keras会自动填充对应数据，使其满足输出大小，而填充的像素数可以通过上述公式计算出来，并且通过pytorch验证。
 ```
 
 ##### pytorch中optimizer.step(), loss.backward()以及optimizer.zero_grad()代码关系
