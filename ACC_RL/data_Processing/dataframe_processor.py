@@ -244,7 +244,19 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
         except FloatingPointError as e:     # numpy将所有0/0错误归于FloatingPointError，第十行定义numpy抛出所有警告类型为错误，即可捕获RunTimeWarning
             print(f"index {index} gap has no change")
             acc_relative[index, :] = 0
-    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, v_relative, acc_relative, acc_compare], axis=1))
+
+    # reward_recal = Caculate_reward(v_relative, gap_, acc_relative)
+    ttc = gap_ / v_relative
+    reward_gap = (np.exp(-(gap_ - 50)**2 / (2 * 5.3**2)) / (np.sqrt(2*np.pi) * 5.3)) * 100 / 7.9
+
+    reward_recal = np.zeros((len(length_ep), 1))
+    for index in range(len(length_ep)):
+        if ttc[index, :] < 0:
+            reward_recal[index, :] = (reward_gap[index, :] - 0.2) / 0.75
+        elif ttc[index, :] >= 0:
+            reward_recal[index, :] = scti_Caculate(ttc[index, :]) * 0.5 + (reward_gap[index, :] - 0.2) * 0.5 / 0.75
+
+    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, v_relative, acc_relative, acc_compare, (reward_gap - 0.2)/0.75, reward_recal], axis=1))
 
     # 制作数据，处理数据 <<<
     fig, axis = plt.subplots()
@@ -256,6 +268,32 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
     plt.legend(handles=[v_rel, gap_rel, acc_rel],
                labels=['v_rel', 'gap_rel', 'acc_rel'], loc='best')
     plt.show()
+
+
+def scti_Caculate(ttc_min, ttc_=8):
+    if ttc_min <= ttc_:
+        scti = (100 * np.power(ttc_min, 1.4)) / (np.power(ttc_min, 1.4) + np.power(ttc_ - ttc_min, 1.5)) / 100
+    elif ttc_min - ttc_ > 100:
+        scti = -1
+    else:
+        scti = (100 * np.exp((-np.power((ttc_min - ttc_), 2)) / (2 * np.power(ttc_, 2)))) / 100
+    return scti
+
+
+def Caculate_reward(v_ref, g_ref, a_ref):
+    a1 = -1.08e-3
+    a2 = 1.136e-4
+    a3 = -1.643e-2
+    a4 = 9.927e-4
+    a5 = -002.163e-3
+    a6 = -1.6435e-2
+    a7 = -7.3387e-2
+    a8 = -2.0589e-2
+    a9 = 6.83969e-2
+    a10 = 1.116254
+    Function = a1*(v_ref**2) + a2*(g_ref**2) + a3*(a_ref**2) + a4*v_ref*g_ref + a5*g_ref*a_ref + a6*v_ref*a_ref + a7*v_ref + a8*g_ref + a9*a_ref + a10
+
+    return Function
 
 
 if __name__ == '__main__':
