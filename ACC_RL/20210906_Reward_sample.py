@@ -19,9 +19,13 @@ from PIL import Image, ImageDraw
 from skimage import color, exposure, transform
 import cv2
 
+np.set_printoptions(precision=4)
 
 EPISODES = 500
 img_rows, img_cols = 80, 80
+Distance_EF = 50
+Return_Time = 5
+Variance = 0.3
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
 img_channels = 4 
@@ -227,13 +231,13 @@ def linear_unbin(arr):
 #   revcData, (remoteHost, remotePort) = sock.recvfrom(65536)
 
 
-def decode(revcData, v_ego = 0, force = 0, episode_len = 0, v_lead_=0):
+def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0, v_lead_copy_=0):
     # received data processing
     revcList = str(revcData).split(',', 4)
-    gap = revcList[0][2:]                    # distance between vehicles
-    v_ego1 = revcList[1]                      # speed of egoVehicle
-    v_lead = revcList[2]                     # speed of leadVehicle
-    a_ego1 = revcList[3]                      # acceleration of egoVehicle
+    gap_ = float(revcList[0][2:])                    # distance between vehicles
+    v_ego1_ = float(revcList[1])                      # speed of egoVehicle
+    v_lead1_ = float(revcList[2])                     # speed of leadVehicle
+    a_ego1_ = float(revcList[3])                      # acceleration of egoVehicle
     img = base64.b64decode(revcList[4])      # image from mainCamera
     image = Image.open(io.BytesIO(img))
     # image resize, 双线性插值
@@ -253,6 +257,7 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0, v_lead_=0):
         ImageDraw.Draw(image).rectangle([(position[0, 0], position[0, 1]), (position[0, 2], position[0, 3])], outline='yellow', width=3)
     image = image.resize((80, 80), resample=Image.BILINEAR)
     image = np.array(image)
+
     '''
     opencv支持
     if position.shape[0] != 0:
@@ -260,85 +265,31 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0, v_lead_=0):
     # 更改双线性插值为区域插值，图像处理完效果好于双线性插值
     image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_AREA)
     '''
-    done = 0
-    v_relative = float(v_lead) - v_lead_
-    reward = CalReward(float(gap), float(v_ego), v_relative, force)
-    if float(gap) <= 3 or float(gap) >= 300:
-        done = 1  
+
+    # 计算reward
+    done_ = 0
+    v_relative = v_ego1_ - v_lead1_
+    action_relative = ((v_ego1_ - v_ego_) / 0.5) - ((v_lead_ - v_lead1_) / 0.5)
+    action_best = (-(50 - float(gap_)) - v_relative * Return_Time) / (2 * Return_Time ** 2)
+
+    reward = CalReward(action_relative, action_best)
+    if gap_ <= 3 or gap_ >= 300:
+        done_ = 1
         reward = -1.0
     elif episode_len > 480:
-        done = 2 
+        done_ = 2
         # reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
 
-    return image, reward, done, float(gap), float(v_ego1), float(v_lead), float(a_ego1)
+    return image, float(reward), done_, float(gap_), float(v_ego1_), float(v_lead1_), float(a_ego1_)
 
 
-def CalReward(gap, v_ego, v_relative, force):
+# 修改正态分布中的方差值，需要重新将正态分布归一化
+def CalReward(action_relative_, action_best_):
     try:
-        ttc = gap / v_relative
-    except ZeroDivisionError as e:
-        ttc = -1
-    reward_gap = (np.exp(-(gap - 50)**2 / (2 * 5.3**2)) / (np.sqrt(2*np.pi) * 5.3)) * 100 / 7.9
-    reward_recal = 0
-    if ttc < 0:
-        reward_recal = reward_gap
-    elif ttc >= 0:
-        reward_recal = scti_Caculate(ttc) * 0.5 + reward_gap * 0.5
-
+        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))) / (np.sqrt(2 * np.pi) * Variance)) / 1.4
+    except FloatingPointError as e:
+        reward_recal = 0
     return reward_recal
-
-    # Rd, Rp = 0, 0
-    # Rd, Rp = 0, 1
-    #
-    # if force > 0:
-    #     a = 3.5*force
-    # else:
-    #     a = 5.5*force
-    #
-    # L0 = -3.037
-    # L1 = -0.591
-    # L3 = -1.047e-3
-    # L4 = -1.403
-    # L5 = 2.831e-2
-    # L8 = -7.98e-2
-    # L11 = 3.535e-3
-    # L12 = -0.243
-    # Rp = (L0 + L1*v_ego + L3*(v_ego**3) + L4* v_ego * a + L5*(v_ego**2) + L8 * (v_ego**2) * a + L11 * (v_ego**3) * a + L12 * v_ego * (a**2))
-    # if Rp>0:
-    #     Rp = 0
-    # Rp = Rp + 195
-    # if v_ego > 40:
-    #     Rp = 0
-    # # reward for gap
-    # if gap >= 40 and gap <= 60:
-    #     Rd = 1
-    # elif gap >= 30 and gap < 40:
-    #     Rd = 0.5
-    # elif gap > 60 and gap <= 100:
-    #     Rd = 0.5
-    # else:
-    #     Rd = 0.0
-    # if gap >= 40 and gap <= 60:
-    #     Rd = 1
-    # elif gap >= 30 and gap < 40:
-    #     Rd = np.power(1.29, (gap - 40))
-    # elif gap > 60 and gap <= 100:
-    #     Rd = np.power(1.29, (-gap + 60))     
-    # else:
-    #     Rd = 0
-
-    # return Rp*Rd
-    # return Rp*Rd/195.0
-
-
-def scti_Caculate(ttc_min, ttc_=21):
-    if ttc_min <= ttc_:
-        scti = (((100 * np.power(ttc_min, 1.4)) / (np.power(ttc_min, 1.4) + np.power(ttc_ - ttc_min, 1.5))) - 7) / 100
-    elif ttc_min - ttc_ > 100:
-        scti = 0
-    else:
-        scti = ((100 * np.exp((-np.power((ttc_min - ttc_), 2)) / (2 * np.power(ttc_, 2)))) - 7) / 100
-    return scti
 
 
 def reset():
@@ -384,7 +335,7 @@ def random_sample(state_t, v_t, state_t1, v_t1):
     return state_t, v_t, state_t1, v_t1
 
 
-def Recv_data_Format(byte_size, _done, v_ego=None, action=None, episode_len=None, s_t=None, v_ego_t=None, v_lead=None):
+def Recv_data_Format(byte_size, _done, v_ego=None, v_lead=None, action=None, episode_len=None, s_t=None, v_ego_t=None):
     if _done != 0: 
         revcData, (remoteHost, remotePort) = sock.recvfrom(byte_size)
         image, _, _, gap, v_ego, v_lead, a_ego = decode(revcData)
@@ -400,7 +351,7 @@ def Recv_data_Format(byte_size, _done, v_ego=None, action=None, episode_len=None
     else:
         revcData, (remoteHost, remotePort) = sock.recvfrom(byte_size)
 
-        image, reward, done, gap, v_ego1, v_lead, a_ego1 = decode(revcData, v_ego, action, episode_len, v_lead)
+        image, reward, done, gap, v_ego1, v_lead, a_ego1 = decode(revcData, v_ego, v_lead, action, episode_len)
 
         x_t1 = agent.process_image(image)
         x_t1 = x_t1.reshape(1, 1, x_t1.shape[0], x_t1.shape[1])     # 1x1x80x80
@@ -497,7 +448,7 @@ if __name__ == "__main__":
             if agent.t % 1000 == 0:
                 rewardTot = []
             episode_len, action, time_cost, UnityReset = Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset)
-            reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1 = Recv_data_Format(unity_Block_size, done, v_ego, action, episode_len, s_t, v_ego_t, v_lead)
+            reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1 = Recv_data_Format(unity_Block_size, done, v_ego, v_lead, action, episode_len, s_t, v_ego_t)
             rewardTot.append(reward)
             start_count_time = int(round(time.time() * 1000))
             
@@ -511,7 +462,7 @@ if __name__ == "__main__":
             v_ego = v_ego_1
             agent.t = agent.t + 1
 
-            print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", reward, "Avg REWARD:",
+            print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", format(reward, '.4f'), "Avg REWARD:",
                     sum(rewardTot)/len(rewardTot) , "/ EPISODE LENGTH", episode_len, "/ Q_MAX " ,
                     agent.max_Q, "/ time " , time_cost, a_ego1)
             format_str = ('EPISODE: %d TIMESTEP: %d EPISODE_LENGTH: %d ACTION: %.4f REWARD: %.4f Avg_REWARD: %.4f training_Loss: %.4f Q_MAX: %.4f gap: %.4f  v_ego: %.4f v_lead: %.4f time: %.0f a_ego: %.4f')
