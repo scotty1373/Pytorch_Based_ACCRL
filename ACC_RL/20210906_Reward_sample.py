@@ -23,9 +23,9 @@ np.set_printoptions(precision=4)
 
 EPISODES = 500
 img_rows, img_cols = 80, 80
-Distance_EF = 50
-Return_Time = 5
-Variance = 0.3
+Distance_EF = 60
+Return_Time = 3
+Variance = 0.5
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
 img_channels = 4 
@@ -269,24 +269,38 @@ def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0,
     # 计算reward
     done_ = 0
     v_relative = v_ego1_ - v_lead1_
-    action_relative = ((v_ego1_ - v_ego_) / 0.5) - ((v_lead_ - v_lead1_) / 0.5)
-    action_best = (-(50 - float(gap_)) - v_relative * Return_Time) / (2 * Return_Time ** 2)
+    action_relative = ((v_ego1_ - v_ego_) / 0.5) - ((v_lead1_ - v_lead_) / 0.5)
+    action_best = (-(Distance_EF - float(gap_)) - v_relative * Return_Time) / (2 * Return_Time ** 2)
 
     reward = CalReward(action_relative, action_best)
+    if 40 <= gap_ <= 60:
+        pass
+    elif 5 < gap_ < 40:
+        reward = reward * ((1 / 35) * gap_ - (1 / 7))
+    elif 60 <= gap_ <= 300:
+        reward = reward * (- (1 / 90) * gap_ + (5 / 3))
+    elif gap_ > 250 or gap_ < 20:
+        reward = 0
+
     if gap_ <= 3 or gap_ >= 300:
         done_ = 1
         reward = -1.0
     elif episode_len > 480:
         done_ = 2
         # reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
-
+    if reward > 1:
+        time.time()
+        pass
     return image, float(reward), done_, float(gap_), float(v_ego1_), float(v_lead1_), float(a_ego1_)
 
 
 # 修改正态分布中的方差值，需要重新将正态分布归一化
 def CalReward(action_relative_, action_best_):
     try:
-        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))) / (np.sqrt(2 * np.pi) * Variance)) / 1.4
+        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))) / (np.sqrt(2 * np.pi) * Variance)) / 0.8
+        if reward_recal > 1:
+            time.time()
+
     except FloatingPointError as e:
         reward_recal = 0
     return reward_recal
@@ -401,7 +415,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cpu')
+    device = torch.device('cuda')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)

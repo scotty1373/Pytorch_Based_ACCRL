@@ -32,6 +32,7 @@ PATH_MODEL = 'save_Model'
 PATH_LOG = 'train_Log'
 time_Feature = round(time.time())
 random_index = np.random.permutation(img_channels)
+TEST_MODEL_PATH = "C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt"
 
 
 class DQNAgent:
@@ -439,7 +440,9 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt")
+        agent.load_model(TEST_MODEL_PATH)
+        agent.model.eval()
+        agent.target_model.eval()
     else:
         # train_thread = threading.Thread(target=thread_Train_init)
         # train_thread.start()
