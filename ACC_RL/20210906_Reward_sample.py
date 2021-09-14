@@ -24,7 +24,7 @@ np.set_printoptions(precision=4)
 EPISODES = 500
 img_rows, img_cols = 80, 80
 Distance_EF = 50
-Return_Time = 3.5
+Return_Time = 3.7
 Variance = 0.5
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
@@ -32,6 +32,7 @@ img_channels = 4
 unity_Block_size = 65536
 # PATH_MODEL = 'C:/dl_data/Python_Project/save_model/'
 # PATH_LOG = 'C:/dl_data/Python_Project/train_log/'
+CHECK_POINT_TRAIN_PATH = './save_Model/save_model_1631506899/save_model_398.h5'
 PATH_MODEL = 'save_Model'
 PATH_LOG = 'train_Log'
 time_Feature = round(time.time())
@@ -44,6 +45,7 @@ class DQNAgent:
         self.max_Q = 0
         self.trainingLoss = 0
         self.train = True
+        self.train_from_checkpoint = True
 
         # Get size of state and action
         self.state_size = state_size
@@ -53,7 +55,7 @@ class DQNAgent:
         # These are hyper parameters for the DQN
         self.discount_factor = 0.99
         self.learning_rate = 1e-4
-        if self.train:
+        if self.train and not self.train_from_checkpoint:
             self.epsilon = 1.0
             self.initial_epsilon = 1.0
         else:
@@ -62,6 +64,7 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.batch_size = 64
         self.train_start = 100
+        self.train_from_checkpoint_start = 3000
         self.explore = 4000
 
         # Create replay memory using deque
@@ -132,7 +135,9 @@ class DQNAgent:
     def train_replay(self):
         if len(self.memory) < self.train_start:
             return
-
+        elif self.train_from_checkpoint:
+            if len(self.memory) < self.train_from_checkpoint_start:
+                return
         batch_size = min(self.batch_size, len(self.memory))
         minibatch = random.sample(self.memory, batch_size)
         '''
@@ -286,19 +291,13 @@ def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0,
     elif episode_len > 480:
         done_ = 2
         # reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
-    if reward > 1:
-        time.time()
-        pass
     return image, float(reward), done_, float(gap_), float(v_ego1_), float(v_lead1_), float(a_ego1_)
 
 
 # 修改正态分布中的方差值，需要重新将正态分布归一化
 def CalReward(action_relative_, action_best_):
     try:
-        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))) / (np.sqrt(2 * np.pi) * Variance)) / 0.8
-        if reward_recal > 1:
-            time.time()
-
+        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))))
     except FloatingPointError as e:
         reward_recal = 0
     return reward_recal
@@ -426,10 +425,11 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model("C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt")
+        agent.load_model('C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_398.h5')
+    elif agent.train_from_checkpoint:
+        agent.load_model(CHECK_POINT_TRAIN_PATH)
+        print(f'Now we load checkpoints for continue training:  {CHECK_POINT_TRAIN_PATH.split("/")[-1]}')
     else:
-        # train_thread = threading.Thread(target=thread_Train_init)
-        # train_thread.start()
         print('Thread Ready!!!')
     done = 0
 
