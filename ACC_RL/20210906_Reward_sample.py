@@ -23,8 +23,8 @@ np.set_printoptions(precision=4)
 
 EPISODES = 500
 img_rows, img_cols = 80, 80
-Distance_EF = 60
-Return_Time = 3
+Distance_EF = 50
+Return_Time = 3.5
 Variance = 0.5
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
@@ -278,9 +278,7 @@ def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0,
     elif 5 < gap_ < 40:
         reward = reward * ((1 / 35) * gap_ - (1 / 7))
     elif 60 <= gap_ <= 300:
-        reward = reward * (- (1 / 90) * gap_ + (5 / 3))
-    elif gap_ > 250 or gap_ < 20:
-        reward = 0
+        reward = reward * (- (1 / 240) * gap_ + (5 / 4))
 
     if gap_ <= 3 or gap_ >= 300:
         done_ = 1
