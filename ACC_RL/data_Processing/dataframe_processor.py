@@ -8,7 +8,7 @@ import datetime as dt
 from numpy import seterr
 
 seterr(all='raise')
-np.set_printoptions(suppress=True, threshold=1000)
+np.set_printoptions(suppress=True, threshold=10000, linewidth=1000)
 
 # vaild sele
 # MENU = sys.argv[1]
@@ -16,7 +16,7 @@ np.set_printoptions(suppress=True, threshold=1000)
 
 # test sele
 MENU = 'graph'
-FILE_PATH = 'train_log_1630487505.txt'
+FILE_PATH = 'train_log_1631506899_reward_with_nonerandom.txt'
 Timestamp = time.time()
 
 date = str(dt.date.today)[1] + str(dt.date.today)[2]
@@ -225,7 +225,7 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
 def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_, index_):
     length_ep, v_lead_, v_ego_, gap_, action_, reward_ = get_singal_info(EPISODE_, EPISODE_LENGTH_,
                                                                          _v_lead, _v_ego, _gap,
-                                                                         ACTION_, REWARD_, index_-1)
+                                                                         ACTION_, REWARD_, index_)
 
     acc_lead_ = np.zeros(((len(length_ep)), 1))
     acc_ego_ = np.zeros(((len(length_ep)), 1))
@@ -263,7 +263,7 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
     # print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, v_relative, acc_relative, acc_compare, (reward_gap - 0.2)/0.75, reward_recal], axis=1))
 
     # 计算距离确定公式是否正确
-    t = 5
+    t = 3.5
     distance_ef = gap_ - (v_relative * 0.5 + 0.5 * acc_compare * 0.5 ** 2)
     action_best = (-(50 - gap_) - v_relative * t) / (2 * t ** 2)
 
@@ -274,7 +274,7 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
             reward_recal[index, :] = (np.exp(-(acc_compare[index, :] - action_best[index, :]) ** 2 / (2 * (0.3 ** 2))) / (np.sqrt(2 * np.pi) * 0.3)) / 1.4
         except FloatingPointError as e:
             reward_recal[index, :] = 0
-    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, distance_ef , action_, reward_, action_best, acc_compare, acc_relative, reward_recal], axis=1))
+    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, action_best, acc_ego_, acc_lead_, acc_compare, reward_recal], axis=1))
     print(f'acc max:{acc_compare[:, 0].max()}')
     print(f'acc min:{acc_compare[:, 0].min()}')
     print(f'v_relative max:{v_relative[:, 0].max()}')
@@ -348,7 +348,8 @@ if __name__ == '__main__':
         indexOfcrash, indexoflose = plot_reward_action_crash(EPISODE, ACTION, gap, EPISODE_LENGTH)
         while True:
             crash_index = input('Enter the crash index you want to view: ')
+            relative(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
             plot_singal_info(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
-            # relative(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
+
 
 

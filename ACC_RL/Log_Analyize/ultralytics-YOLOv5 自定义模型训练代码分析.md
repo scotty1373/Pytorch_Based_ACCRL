@@ -168,6 +168,11 @@ def main(opt):
 ##### 训练部分：
 
 ```python
+'''
+trian.py调用pytorch中autocast的amp方法实现混合精度训练
+混合精度官方文档https://pytorch.org/tutorials/recipes/recipes/amp_recipe.html#:~:text=View%20on%20GitHub-,AUTOMATIC%20MIXED%20PRECISION,-Author%3A%20Michael%20Carilli
+'''
+
 def train(hyp,  # path/to/hyp.yaml or hyp dictionary
           opt,
           device,
@@ -509,7 +514,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             if (not nosave) or (final_epoch and not evolve):  # if save
                 ckpt = {'epoch': epoch,
                         'best_fitness': best_fitness,
+                        # model存储按半精度存储
                         'model': deepcopy(de_parallel(model)).half(),
+                        # ema深拷贝，在开辟新内存空间存放ema数据，并转换float为半精度
                         'ema': deepcopy(ema.ema).half(),
                         'updates': ema.updates,
                         'optimizer': optimizer.state_dict(),
