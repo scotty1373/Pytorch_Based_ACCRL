@@ -45,7 +45,7 @@ class DQNAgent:
         self.max_Q = 0
         self.trainingLoss = 0
         self.train = True
-        self.train_from_checkpoint = True
+        self.train_from_checkpoint = False
 
         # Get size of state and action
         self.state_size = state_size
@@ -412,7 +412,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -435,7 +435,7 @@ if __name__ == "__main__":
 
     # 增加yolo目标检测算法支持
     torch.hub.set_dir('./')
-    yolo = torch.hub.load('ultralytics/yolov5', 'yolov5s').to(device)
+    yolo = torch.hub.load('ultralytics/yolov5', 'custom', path='./weights/nc1_car.pt').to(device)
 
     for e in range(EPISODES):      
         print("Episode: ", e)
