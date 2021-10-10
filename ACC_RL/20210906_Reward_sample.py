@@ -25,14 +25,15 @@ EPISODES = 500
 img_rows, img_cols = 80, 80
 Distance_EF = 50
 Return_Time = 3.7
-Variance = 0.5
+Variance = 0.8
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
 img_channels = 4 
 unity_Block_size = 65536
 # PATH_MODEL = 'C:/dl_data/Python_Project/save_model/'
 # PATH_LOG = 'C:/dl_data/Python_Project/train_log/'
-CHECK_POINT_TRAIN_PATH = './save_Model/save_model_1631506899/save_model_398.h5'
+# C:\DRL_data\Python_Project\Pytorch_Learning-multi-Thread\ACC_RL\save_Model\save_model_1633081266
+CHECK_POINT_TRAIN_PATH = './save_Model/save_model_1633081266/save_model_298.h5'
 PATH_MODEL = 'save_Model'
 PATH_LOG = 'train_Log'
 time_Feature = round(time.time())
@@ -45,7 +46,7 @@ class DQNAgent:
         self.max_Q = 0
         self.trainingLoss = 0
         self.train = True
-        self.train_from_checkpoint = False
+        self.train_from_checkpoint = True
 
         # Get size of state and action
         self.state_size = state_size
@@ -412,7 +413,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cpu')
+    device = torch.device('cuda')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -425,7 +426,7 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model('C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_398.h5')
+        agent.load_model('./save_Model/save_model_1633168898/save_model_298.h5')
     elif agent.train_from_checkpoint:
         agent.load_model(CHECK_POINT_TRAIN_PATH)
         print(f'Now we load checkpoints for continue training:  {CHECK_POINT_TRAIN_PATH.split("/")[-1]}')

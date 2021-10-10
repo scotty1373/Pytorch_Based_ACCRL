@@ -19,9 +19,11 @@ class Data_dim_reduce(nn.Module):
         self.activation3 = nn.ReLU(inplace=True)
         self.conv4 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3),
                                stride=(1, 1), padding=(1, 1))
-        self.Dense1 = nn.Linear(3200, 128)
+        self.Dense1 = nn.Linear(3200, 512)
         self.activationDense = nn.ReLU(inplace=True)
-        self.Dense2 = nn.Linear(128, 21)
+        self.Dense2 = nn.Linear(512, 128)
+        self.activationDense2 = nn.ReLU(inplace=True)
+        self.Dense3 = nn.Linear(128, 21)
 
         self.inputDense1 = nn.Linear(4, 16)
         self.inputDense2 = nn.Linear(16, 21)
@@ -54,6 +56,8 @@ class Data_dim_reduce(nn.Module):
         feature = self.Dense1(feature)
         feature = self.activationDense(feature)
         feature = self.Dense2(feature)
+        feature = self.activationDense2(feature)
+        feature = self.Dense3(feature)
 
         velocity = self.inputDense1(x2)
         velocity = self.inputDense2(velocity)
