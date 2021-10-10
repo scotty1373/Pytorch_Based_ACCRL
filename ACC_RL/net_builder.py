@@ -67,7 +67,7 @@ if __name__ == "__main__":
     net = Data_dim_reduce()
     x = np.random.normal(size=(10, 4, 80, 80))
     y = np.random.normal(size=(10, 4))
-
+    net(x, y)
 
     epoch = 233
     # 参数保存和读取
