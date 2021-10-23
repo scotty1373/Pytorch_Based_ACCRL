@@ -543,19 +543,92 @@ conv2_torch(x).shape
 
 ##### pytorch中optimizer.step(), loss.backward()以及optimizer.zero_grad()代码关系
 
-```
+```python
+# DDPG算法换用DDQN过程中，使用一个common网络对图像进行特征提取，再将提取的特征传入Actor和Critic网络。
+# Actor和Critic更新的过程中，需要Critic_optimizer和Actor_optimizer不仅对自己的网络更新，
+# 同时通过梯度回流到common网络一起进行更新。具体代码如下
 
+# 优化器初始化代码
+self.opt_actor = torch.optim.Adam(itertools.chain(self.common_model.parameters(),
+                                                  self.actor_model.parameters()),
+                                  lr=1e-4)
+self.opt_critic = torch.optim.Adam(itertools.chain(self.common_model.parameters(),
+                                                   self.critic_model.parameters()),
+                                   lr=1e-3, weight_decay=1e-2)
+
+# 经验池训练代码
+def train_replay(self):
+    if len(self.memory) < self.train_start:
+        return
+    elif self.train_from_checkpoint:
+        if len(self.memory) < self.train_from_checkpoint_start:
+            return
+        batch_size = min(self.batch_size, len(self.memory))
+        minibatch = random.sample(self.memory, batch_size)
+        '''
+            torch.float64对应torch.DoubleTensor
+            torch.float32对应torch.FloatTensor
+            '''
+        # from_numpy会对numpy数据类型转换成双精度张量，而torch.Tensor不存在这种问题，torch.Tensor将数组转换成单精度张量
+        state_t, v_ego_t, action_t, reward_t, state_t1, v_ego_t1, terminal, step = zip(*minibatch)
+        state_t = Variable(torch.Tensor(state_t).squeeze().to(self.device))
+        state_t1 = Variable(torch.Tensor(state_t1).squeeze().to(self.device))
+        v_ego_t = Variable(torch.Tensor(v_ego_t).squeeze().to(self.device))
+        v_ego_t1 = Variable(torch.Tensor(v_ego_t1).squeeze().to(device))
+        reward_t = torch.Tensor(reward_t).reshape(-1, 1).to(self.device)
+        action_t = torch.Tensor(action_t).reshape(-1, 1).to(self.device)
+
+        self.opt_critic.zero_grad()
+        feature_extraction_target = self.common_target_model(state_t1, v_ego_t1)
+        action_target = self.actor_target_model(feature_extraction_target)
+
+        td_target = reward_t + self.discount_factor * self.critic_target_model(feature_extraction_target, action_target.detach())
+
+        feature_extraction = self.common_model(state_t, v_ego_t)
+        critic_loss_cal = self.loss_critic(self.critic_model(feature_extraction, action_t), td_target.detach())
+        critic_loss_cal.backward()
+        self.opt_critic.step()
+        self.history_loss_critic = critic_loss_cal.item()
+
+        # 重置critic，actor优化器参数
+        self.opt_actor.zero_grad()
+        self.opt_critic.zero_grad()
+        acotr_feature_extraction = self.common_model(state_t, v_ego_t)
+        policy_actor = -self.critic_model(acotr_feature_extraction, self.actor_model(acotr_feature_extraction))
+        policy_actor = policy_actor.mean()
+        policy_actor.backward()
+        self.opt_actor.step()
+        self.history_loss_actor = policy_actor.item()
+
+        soft_update_target_model(self.common_model, self.common_target_model, self.tua)
+        soft_update_target_model(self.actor_model, self.actor_target_model, self.tua)
+        soft_update_target_model(self.critic_model, self.critic_target_model, self.tua)
 ```
 
 ##### pytorch 0.4版本中后Variable和Tensor合并之后的关系
 
-```
+```python
+import torch
+from torch.autograd import Variable
 
+x_tensor = torch.Tensor(3,4)
+x_var = Variable(x_tensor,requires_grad=True)
+'''
+实际查看x_var和x_tensor的requires_grad_()查看对应tensor的grad发现Variable和Tensor创建的对象是一样的，也就是说在0.4版本之后不需要再对tensor做Variable操作，即可进行autograd追踪梯度。
+'''
 ```
 
 ##### YOLOv5 调用.show()方法后会在原图上叠加预测锚框
 
-```
+```python
+# ACC_RL中对yolo识别之后的数据处理
+anchor_box = yolo(images)
+position = np.array(xyxy2xyxy(anchor_box.pred[0]), dtype='uint8')
 
+if position.shape[0] != 0:
+	ImageDraw.Draw(image).rectangle([(position[0, 0], position[0, 1]), (position[0, 2], position[0, 3])], outline='yellow', width=3)
+image = image.resize((80, 80), resample=Image.BILINEAR)
+image = np.array(image)
+# anchor_box = yolo(images)之后调用anchor_box.show()方法，相当于对原图进行ImageDraw,标记框会直接加在原图上
 ```
 
