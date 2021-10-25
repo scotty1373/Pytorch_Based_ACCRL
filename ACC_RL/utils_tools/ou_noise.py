@@ -4,6 +4,7 @@
 # Date: 2016.5.4
 # Reference: https://github.com/rllab/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
 # --------------------------------------
+import time
 
 import numpy as np
 import numpy.random as nr
@@ -26,6 +27,7 @@ class OUNoise:
         dx = self.theta * (self.mu - x) + self.sigma * nr.randn(len(x))
         self.state = x + dx
         return self.state
+
 
 class AdaptiveParamNoiseSpec(object):
     def __init__(self, initial_stddev=0.1, desired_action_stddev=0.1, adoption_coefficient=1.01):
@@ -73,7 +75,7 @@ class NormalActionNoise(ActionNoise):
 
 # Based on http://math.stackexchange.com/questions/1287634/implementing-ornstein-uhlenbeck-in-matlab
 class OrnsteinUhlenbeckActionNoise(ActionNoise):
-    def __init__(self, mu, sigma, theta=.15, dt=1e-2, x0=None):
+    def __init__(self, mu, sigma, theta=0.15, dt=1e-2, x0=None):
         self.theta = theta
         self.mu = mu
         self.sigma = sigma
@@ -94,16 +96,18 @@ class OrnsteinUhlenbeckActionNoise(ActionNoise):
 
 
 if __name__ == '__main__':
-    ou = OrnsteinUhlenbeckActionNoise(np.zeros(1), np.ones(1) * 0.2)
+    ou = OrnsteinUhlenbeckActionNoise(np.zeros(1), np.ones(1) * 0.15)
+
     states = []
-    for i in range(1, 10000):
+    for i in range(1, 1000):
         if i % 100 == 0:
             ou.reset()
-        if i > 3000:
-            states.append((ou.__call__()) * (np.exp(3000 - i) * 3000))
         else:
             states.append(ou.__call__())
+            # states.append(ou.__call__())
+    np.array(states)
     import matplotlib.pyplot as plt
 
     plt.plot(states)
     plt.show()
+
