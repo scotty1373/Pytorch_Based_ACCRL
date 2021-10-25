@@ -65,6 +65,7 @@ class Actor(nn.Module):
         self.Dense1 = nn.Linear(128, 32)
         self.actv1 = nn.ReLU(inplace=True)
         self.Dense2 = nn.Linear(32, 1)
+        torch.nn.init.uniform_(self.Dense2.weight, a=-3e-3, b=3e-3)
         self.actv2 = nn.Tanh()
 
     def forward(self, common):
@@ -84,6 +85,7 @@ class Critic(nn.Module):
         self.actv1 = nn.ReLU(inplace=True)
         self.inputDense = nn.Linear(1, 16)
         self.Dense2 = nn.Linear(48, 1)
+        torch.nn.init.uniform_(self.Dense2.weight, a=-3e-3, b=3e-3)
 
     def forward(self, common, action):
         critic = self.Dense1(common)

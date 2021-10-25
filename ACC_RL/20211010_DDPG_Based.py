@@ -9,11 +9,13 @@ import sys
 import time
 from collections import deque
 import itertools
-from utils.net import Common, Actor, Critic
+from utils_tools.net import Common, Actor, Critic
+from utils_tools.ou_noise import OrnsteinUhlenbeckActionNoise
 import numpy as np
 import skimage
 import torch
 from torch.autograd import Variable
+from thop import profile
 
 from PIL import Image, ImageDraw
 from skimage import color, exposure, transform
@@ -39,7 +41,7 @@ time_Feature = round(time.time())
 random_index = np.random.permutation(img_channels)
 
 
-class DQNAgent:
+class DDPG:
     def __init__(self, state_size, action_size, device_):
         self.t = 0
         self.max_Q = 0
@@ -54,25 +56,27 @@ class DQNAgent:
 
         # These are hyper parameters for the DQN
         self.discount_factor = 0.99
-        self.learning_rate = 1e-4
         if self.train and not self.train_from_checkpoint:
             self.epsilon = 1.0
             self.initial_epsilon = 1.0
         else:
             self.epsilon = 0
             self.initial_epsilon = 0
-        self.epsilon_min = 0.01
         self.batch_size = 64
-        self.train_start = 100
+        self.train_start = 5000
         self.train_from_checkpoint_start = 3000
-        self.explore = 4000
+        self.epsilon_min = 0.001
+        self.explore = 10000
+        self.t = 1e-3
+        self.history_loss_actor = 0
+        self.history_loss_critic = 0
 
         # Create replay memory using deque
         self.memory = deque(maxlen=32000)
 
         # Create main model and target model
         self.common_model = Common().to(self.device)
-        self.common_target_model = Common.to(self.device)
+        self.common_target_model = Common().to(self.device)
 
         self.actor_model = Actor().to(self.device)
         self.actor_target_model = Actor().to(self.device)
@@ -81,14 +85,18 @@ class DQNAgent:
         self.critic_target_model = Critic().to(self.device)
         # Copy the model to target model
         # --> initialize the target model so that the parameters of model & target model to be same
-        self.update_target_model()
         self.opt_actor = torch.optim.Adam(itertools.chain(self.common_model.parameters(),
                                                           self.actor_model.parameters()),
                                           lr=1e-4)
         self.opt_critic = torch.optim.Adam(itertools.chain(self.common_model.parameters(),
                                                            self.critic_model.parameters()),
-                                           lr=1e-4)
-        self.loss = torch.nn.MSELoss()
+                                           lr=1e-3, weight_decay=1e-2)
+        self.loss_actor = torch.nn.MSELoss()
+        self.loss_critic = torch.nn.MSELoss()
+
+        hard_update_target_model(self.common_model, self.common_target_model)
+        hard_update_target_model(self.actor_model, self.actor_target_model)
+        hard_update_target_model(self.critic_model, self.critic_target_model)
 
     @staticmethod
     def process_image(self, obs):
@@ -120,29 +128,23 @@ class DQNAgent:
 
         # return out_img
 
-    def update_target_model(self):
-        # 解决state_dict浅拷贝问题
-        weight_model = copy.deepcopy(self.model.state_dict())
-        self.target_model.load_state_dict(weight_model)
-
     # Get action from model using epsilon-greedy policy
-    def get_action(self, Input):
+    def get_action(self, Input, noise_added=None):
+        self.actor_model.eval()
+        mu = self.actor_model(Input[0], Input[1])
+        self.actor_model.train()
         if np.random.rand() <= self.epsilon:
-            # print("Return Random Value")
-            # return random.randrange(self.action_size)
-            return np.random.uniform(-1, 1)
-        else:
-            # print("Return Max Q Prediction")
-            q_value = self.model(Input[0], Input[1])
-            # Convert q array to steering value
-            return linear_unbin(q_value[0])
+            if noise_added is not None:
+                noise_added = torch.from_numpy(noise_added.__call__()).to(self.device)
+                mu += noise_added
+                mu = torch.clamp(mu, min=action_size[0], max=action_size[1])
+        return mu
 
     def replay_memory(self, state, v_ego, action, reward, next_state, nextV_ego, done):
         self.memory.append((state, v_ego, action, reward, next_state, nextV_ego, done, self.t))
         if self.epsilon > self.epsilon_min:
             self.epsilon -= (self.initial_epsilon - self.epsilon_min) / self.explore
 
-    # @profile
     def train_replay(self):
         if len(self.memory) < self.train_start:
             return
@@ -161,23 +163,28 @@ class DQNAgent:
         v_ego_t = Variable(torch.Tensor(v_ego_t).squeeze().to(self.device))
         v_ego_t1 = Variable(torch.Tensor(v_ego_t1).squeeze().to(device))
 
-        self.optimizer.zero_grad()
+        self.opt_critic.zero_grad()
+        feature_extraction_target = self.common_target_model(state_t1, v_ego_t1)
+        action_target = self.actor_target_model(feature_extraction_target)
+        td_target = reward_t + self.discount_factor * self.critic_model(feature_extraction_target, action_target)
 
-        targets = self.model(state_t, v_ego_t)
-        self.max_Q = torch.max(targets[0]).item()
-        target_val = self.model(state_t1, v_ego_t1)
-        target_val_ = self.target_model(state_t1, v_ego_t1)
-        for i in range(batch_size):
-            if terminal[i] == 1:
-                targets[i][action_t[i]] = reward_t[i]
-            else:
-                a = torch.argmax(target_val[i])
-                targets[i][action_t[i]] = reward_t[i] + self.discount_factor * (target_val_[i][a])
-        logits = self.model(state_t, v_ego_t)
-        loss = self.loss(logits, targets)
-        loss.backward()
-        self.optimizer.step()
-        self.trainingLoss = loss.item()
+        feature_extraction = self.common_model(state_t, v_ego_t)
+        critic_loss_cal = self.loss_critic(self.critic_model(feature_extraction, action_t), td_target)
+        critic_loss_cal.backward()
+        self.opt_critic.step()
+        self.history_loss_critic = critic_loss_cal.item()
+
+        self.opt_actor.zero_grad()
+        acotr_feature_extraction = self.common_model(state_t, v_ego_t)
+        policy_actor = -self.critic_model(acotr_feature_extraction, self.actor_model(acotr_feature_extraction))
+        policy_actor = policy_actor.mean()
+        policy_actor.backward()
+        self.opt_actor.step()
+        self.history_loss_actor = policy_actor.item()
+
+        soft_update_target_model(self.common_model, self.common_target_model, self.t)
+        soft_update_target_model(self.actor_model, self.actor_target_model, self.t)
+        soft_update_target_model(self.critic_model, self.critic_target_model, self.t)
 
     def load_model(self, name):
         checkpoints = torch.load(name)
@@ -188,6 +195,19 @@ class DQNAgent:
     def save_model(self, name):
         torch.save({'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict()}, name)
+
+# target model硬更新
+def hard_update_target_model(model, target_model):
+    # 解决state_dict浅拷贝问题
+    weight_model = copy.deepcopy(model.state_dict())
+    target_model.load_state_dict(weight_model)
+
+
+# target model软更新
+def soft_update_target_model(model, target_model, t):
+    for target_param, source_param in zip(target_model.paameters(),
+                                          model.parameters()):
+        target_param.data.copy_((1 - t) * target_param + t * source_param)
 
 
 # 单目标斜对角坐标
@@ -243,8 +263,6 @@ def linear_unbin(arr):
     b = np.argmax(arr)
     a = b * 2 / 20 - 1
     return a
-# def oberve():
-#   revcData, (remoteHost, remotePort) = sock.recvfrom(65536)
 
 
 def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0, v_lead_copy_=0):
@@ -325,20 +343,6 @@ def print_out(file, text):
     sys.stdout.flush()
 
 
-# @profile
-def thread_Train_init():
-    global agent
-    step_epsode = 0
-    while True:
-        if len(agent.memory) < agent.train_start:
-            time.sleep(5)
-            continue
-        agent.train_replay()
-        time.sleep(0.1)
-        step_epsode += 1
-        # print('train complete in num: %s' %str(step_epsode))
-
-
 def log_File_path(path):
     # date = str(dt.date.today()).split('-')
     # date_concat = date[1] + date[2]
@@ -346,15 +350,6 @@ def log_File_path(path):
     train_log = open(os.path.join(path, 'train_log_{}.txt'.format(date_concat)), 'w')
     del date_concat
     return train_log
-
-
-def random_sample(state_t, v_t, state_t1, v_t1):
-    # random_index = np.random.permutation(img_channels)
-    state_t = state_t[:, :, :, random_index]
-    v_t = v_t[:, random_index]
-    state_t1 = state_t1[:, :, :, random_index]
-    v_t1 = v_t1[:, random_index]
-    return state_t, v_t, state_t1, v_t1
 
 
 def Recv_data_Format(byte_size, _done, v_ego=None, v_lead=None, action=None, episode_len=None, s_t=None, v_ego_t=None):
@@ -386,13 +381,13 @@ def Recv_data_Format(byte_size, _done, v_ego=None, v_lead=None, action=None, epi
 
 
 # def Send_data_Format(remoteHost, remotePort, onlyresetloc, s_t, v_ego_t):
-def Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset):
+def Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset, action_noise=None):
     pred_time_pre = dt.datetime.now()
     episode_len = episode_len + 1            
     # Get action for the current state and go one step in environment
     s_t = torch.Tensor(s_t).to(device)
     v_ego_t = torch.Tensor(v_ego_t).to(device)
-    force = agent.get_action([s_t, v_ego_t])
+    force = agent.get_action([s_t, v_ego_t], action_noise)
     action = force
       
     if UnityReset == 1: 
@@ -423,16 +418,18 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
-    action_size = 21    # env.action_space.n # Steering and Throttle
+    action_size = (-1, 1)   # env.action_space.n # Steering and Throttle
 
-    # train_log = log_File_path(PATH_LOG)
-    # PATH_ = Model_save_Dir(PATH_MODEL, time_Feature)
-    agent = DQNAgent(state_size, action_size, device)
+    train_log = log_File_path(PATH_LOG)
+    PATH_ = Model_save_Dir(PATH_MODEL, time_Feature)
+    agent = DDPG(state_size, action_size, device)
     episodes = []
+
+    noise = OrnsteinUhlenbeckActionNoise(np.zeros(1), np.ones(1) * 0.2)
 
     if not agent.train:
         print("Now we load the saved model")
@@ -447,9 +444,17 @@ if __name__ == "__main__":
     # 增加yolo目标检测算法支持
     torch.hub.set_dir('./')
     yolo = torch.hub.load('ultralytics/yolov5', 'custom', path='./weights/nc1_car.pt').to(device)
+    inputs = torch.rand((1, 3, 400, 400))
+    MACs, params = profile(model=yolo.model, inputs=(inputs, ))
+    print(f'MACs: {MACs/1e9:.2f}GFLOPs, params: {params/1e6:.2f}M')
+    inputs = torch.rand((1, 4, 80, 80))
+    MACs, params = profile(model=agent.common_model, inputs=(inputs,))
+    print(f'MACs: {MACs / 1e9:.2f}GFLOPs, params: {params / 1e6:.2f}M')
 
     for e in range(EPISODES):      
         print("Episode: ", e)
+        # ou noise重置
+        noise.reset()
         # Multi Thread
         if done == 2:
             print("new continued epicode!")
@@ -470,7 +475,7 @@ if __name__ == "__main__":
             start_time = time.time()
             if agent.t % 1000 == 0:
                 rewardTot = []
-            episode_len, action, time_cost, UnityReset = Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset)
+            episode_len, action, time_cost, UnityReset = Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset, noise)
             reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1 = Recv_data_Format(unity_Block_size, done, v_ego, v_lead, action, episode_len, s_t, v_ego_t)
             rewardTot.append(reward)
             start_count_time = int(round(time.time() * 1000))
@@ -487,9 +492,9 @@ if __name__ == "__main__":
 
             print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", format(reward, '.4f'), "Avg REWARD:",
                     sum(rewardTot)/len(rewardTot) , "/ EPISODE LENGTH", episode_len, "/ Q_MAX " ,
-                    agent.max_Q, "/ time " , time_cost, a_ego1)
-            format_str = ('EPISODE: %d TIMESTEP: %d EPISODE_LENGTH: %d ACTION: %.4f REWARD: %.4f Avg_REWARD: %.4f training_Loss: %.4f Q_MAX: %.4f gap: %.4f  v_ego: %.4f v_lead: %.4f time: %.0f a_ego: %.4f')
-            text = (format_str % (e, agent.t, episode_len, action, reward, sum(rewardTot)/len(rewardTot), agent.trainingLoss*1e3, agent.max_Q, gap, v_ego1, v_lead, time.time()-start_time, a_ego1))
+                    agent.max_Q, "/ time " , time_cost, a_ego1, 'loss_actor', agent.history_loss_actor, 'loss_critic', agent.history_loss_critic)
+            format_str = 'EPISODE: %d TIMESTEP: %d EPISODE_LENGTH: %d ACTION: %.4f REWARD: %.4f Avg_REWARD: %.4f training_Loss: %.4f Q_MAX: %.4f gap: %.4f  v_ego: %.4f v_lead: %.4f time: %.0f a_ego: %.4f'
+            text = (format_str % (e, agent.t, episode_len, action, reward, sum(rewardTot)/len(rewardTot), [agent.history_loss_actor, agent.history_loss_critic]*1e3, agent.max_Q, gap, v_ego1, v_lead, time.time()-start_time, a_ego1))
             print_out(train_log, text)
             if done:
                 agent.update_target_model()
