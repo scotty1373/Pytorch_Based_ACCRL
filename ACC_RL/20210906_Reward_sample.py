@@ -14,6 +14,7 @@ import numpy as np
 import skimage
 import torch
 from torch.autograd import Variable
+from thop import profile
 
 from PIL import Image, ImageDraw
 from skimage import color, exposure, transform
@@ -46,7 +47,7 @@ class DQNAgent:
         self.max_Q = 0
         self.trainingLoss = 0
         self.train = True
-        self.train_from_checkpoint = True
+        self.train_from_checkpoint = False
 
         # Get size of state and action
         self.state_size = state_size
@@ -413,7 +414,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -437,6 +438,14 @@ if __name__ == "__main__":
     # 增加yolo目标检测算法支持
     torch.hub.set_dir('./')
     yolo = torch.hub.load('ultralytics/yolov5', 'custom', path='./weights/nc1_car.pt').to(device)
+
+    inputs_shape = torch.rand((1, 3, 640, 640))
+    macs, param = profile(model=yolo.model, inputs=(inputs_shape, ))
+    print(f'MACs: {macs/1e9:.2f}GFLOPs, Parameters: {param/1e6:.2f}M')
+
+    inputs_shape = torch.rand((1, 4, 80, 80))
+    macs, param = profile(model=agent.model, inputs=(inputs_shape, torch.rand(1, 4),))
+    print(f'MACs: {macs/1e9:.2f}GFLOPs, Parameters: {param/1e6:.2f}M')
 
     for e in range(EPISODES):      
         print("Episode: ", e)
