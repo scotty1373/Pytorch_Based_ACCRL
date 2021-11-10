@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
+import time
+
 import torch
 import torchvision
 import numpy as np
 
 batch_size = 128
+device = torch.device('cpu')
 
 train_loader = torch.utils.data.DataLoader(
     torchvision.datasets.MNIST('mnist_data', train=True, download=True,
@@ -52,11 +55,14 @@ class Net_Builder(torch.nn.Module):
 def training():
     global net
     train_loss_ = np.zeros((3, 60000//batch_size))
+    start_time = time.time()
     for epoch in range(3):
         # the parameter which need to update, put the parameter in optimizer's parameter option
         optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
         for batch_idx, (x_train, y_train) in enumerate(train_loader):
+            x_train = x_train.to(device)
+            y_train = y_train.to(device)
             x_train = x_train.view(-1, 28*28)
             out = net(x_train)
             y_onehot = torch.nn.functional.one_hot(y_train, 10)
@@ -73,17 +79,20 @@ def training():
 
         single_label_acc = np.zeros((10, 1))
         for test_idx, (x_test, y_test) in enumerate(test_loader):
+            x_test = x_test.to(device)
+            y_test = y_test.to(device)
             for labels in range(10):
-                single_labels_index = np.squeeze(np.argwhere(y_test.numpy() == labels))
+                single_labels_index = np.squeeze(np.argwhere(y_test.cpu().numpy() == labels))
                 single_labels_x_test = x_test[single_labels_index, :, :, :].view(-1, 28*28)
                 result = net(single_labels_x_test)
                 result = torch.argmax(result, dim=1)
                 correct = torch.eq(result, y_test[single_labels_index])
-                single_label_acc[labels, :] = torch.mean(correct.float())
+                single_label_acc[labels, :] = torch.mean(correct.float()).cpu()
                 print(f'Test acc of num {labels}: {single_label_acc[labels, :]}')
         print(f'loss mean: {np.mean(train_loss_[epoch, :])}')
+    print(f'time cost: {time.time() - start_time}')
 
 
 if __name__ == '__main__':
-    net = Net_Builder()
+    net = Net_Builder().to(device)
     training()

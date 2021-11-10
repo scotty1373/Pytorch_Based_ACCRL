@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 batch_size = [64, 1000]
-epoches = 100
+epoches = 10
 num_cate = 10
 
 cifar_train, cifar_test = dataset_collect(batchsz=batch_size)
@@ -58,16 +58,18 @@ def train():
 
 
 if __name__ == "__main__":
-    device = torch.device('cpu')
+    device = torch.device('cuda')
     model = ResNet([2, 2, 2, 2], 4).to(device)
     # model = ln(10).to(device)
     print(model)    # 打印类实例
-    optim = torch.optim.SGD(model.parameters(), lr=1e-2)
+    optim = torch.optim.SGD(model.parameters(), lr=1e-3)
     sch = torch.optim.lr_scheduler.StepLR(optim, step_size=50, last_epoch=-1, gamma=0.1)
     # 根据步长变化学习率
     scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=20, gamma=0.1, last_epoch=-1)
     criterion = torch.nn.CrossEntropyLoss(reduction='mean')
+    start_time = time.time()
     train()
+    print(f'time cost: {time.time() - start_time}')
 
 
 
