@@ -8,7 +8,7 @@ import socket
 import sys
 import time
 from collections import deque
-from net_builder import Data_dim_reduce as build_model
+from utils_tools.net_builder import Data_dim_reduce as build_model
 import numpy as np
 import skimage
 import torch

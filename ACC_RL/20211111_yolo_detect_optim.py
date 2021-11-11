@@ -6,51 +6,55 @@ import os
 import random
 import socket
 import sys
-import threading
 import time
 from collections import deque
-from net_builder import Data_dim_reduce as build_model
+from utils_tools.net_feature import yolo_feature_processor as build_model
 import numpy as np
 import skimage
 import torch
 from torch.autograd import Variable
 
 from PIL import Image, ImageDraw
-from skimage import color, exposure, transform
-import cv2
+from skimage import color
 
+np.set_printoptions(precision=4)
 
-EPISODES = 500
+EPISODES = 350
 img_rows, img_cols = 80, 80
+Distance_EF = 50
+Return_Time = 7
+Variance = 0.5
 # Convert image into gray scale
 # We stack 8 frames, 0.06*8 sec
 img_channels = 4 
 unity_Block_size = 65536
 # PATH_MODEL = 'C:/dl_data/Python_Project/save_model/'
 # PATH_LOG = 'C:/dl_data/Python_Project/train_log/'
+# C:\DRL_data\Python_Project\Pytorch_Learning-multi-Thread\ACC_RL\save_Model\save_model_1633081266
+CHECK_POINT_TRAIN_PATH = './save_Model/save_model_1633081266/save_model_298.h5'
 PATH_MODEL = 'save_Model'
 PATH_LOG = 'train_Log'
 time_Feature = round(time.time())
 random_index = np.random.permutation(img_channels)
-TEST_MODEL_PATH = "C:/DRL_data/Python_Project/Enhence_Learning/save_Model/save_model_1627300305/save_model_248.pt"
 
 
 class DQNAgent:
-    def __init__(self, state_size, action_size, device_):
+    def __init__(self, state_size_, action_size_, device_):
         self.t = 0
         self.max_Q = 0
         self.trainingLoss = 0
         self.train = True
+        self.train_from_checkpoint = False
 
         # Get size of state and action
-        self.state_size = state_size
-        self.action_size = action_size
+        self.state_size = state_size_
+        self.action_size = action_size_
         self.device = device_
 
         # These are hyper parameters for the DQN
         self.discount_factor = 0.99
         self.learning_rate = 1e-4
-        if self.train:
+        if self.train and not self.train_from_checkpoint:
             self.epsilon = 1.0
             self.initial_epsilon = 1.0
         else:
@@ -59,14 +63,15 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.batch_size = 64
         self.train_start = 100
+        self.train_from_checkpoint_start = 3000
         self.explore = 4000
 
         # Create replay memory using deque
         self.memory = deque(maxlen=32000)
 
         # Create main model and target model
-        self.model = build_model().to(self.device)
-        self.target_model = build_model().to(self.device)
+        self.model = build_model(4, 21).to(self.device)
+        self.target_model = build_model(4, 21).to(self.device)
 
         # Copy the model to target model
         # --> initialize the target model so that the parameters of model & target model to be same
@@ -129,7 +134,9 @@ class DQNAgent:
     def train_replay(self):
         if len(self.memory) < self.train_start:
             return
-
+        elif self.train_from_checkpoint:
+            if len(self.memory) < self.train_from_checkpoint_start:
+                return
         batch_size = min(self.batch_size, len(self.memory))
         minibatch = random.sample(self.memory, batch_size)
         '''
@@ -228,13 +235,13 @@ def linear_unbin(arr):
 #   revcData, (remoteHost, remotePort) = sock.recvfrom(65536)
 
 
-def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
+def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0, v_lead_copy_=0):
     # received data processing
     revcList = str(revcData).split(',', 4)
-    gap = revcList[0][2:]                    # distance between vehicles
-    v_ego1 = revcList[1]                      # speed of egoVehicle
-    v_lead = revcList[2]                     # speed of leadVehicle
-    a_ego1 = revcList[3]                      # acceleration of egoVehicle
+    gap_ = float(revcList[0][2:])                    # distance between vehicles
+    v_ego1_ = float(revcList[1])                      # speed of egoVehicle
+    v_lead1_ = float(revcList[2])                     # speed of leadVehicle
+    a_ego1_ = float(revcList[3])                      # acceleration of egoVehicle
     img = base64.b64decode(revcList[4])      # image from mainCamera
     image = Image.open(io.BytesIO(img))
     # image resize, 双线性插值
@@ -247,76 +254,93 @@ def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
 
     # 当前代码问题，yolo输出锚框为1时选取锚框问题，暂时解决通过取消squeeze
     # !!!锚框缺失问题!!!
-    position = np.array(xyxy2xyxy(anchor_box.pred[0]), dtype='uint8')
-
-    # pillow 支持
+    position = np.array(xyxy2xywh(anchor_box.pred[0]), dtype='uint8')
     if position.shape[0] != 0:
-        ImageDraw.Draw(image).rectangle([(position[0, 0], position[0, 1]), (position[0, 2], position[0, 3])], outline='yellow', width=3)
-    image = image.resize((80, 80), resample=Image.BILINEAR)
-    image = np.array(image)
-    '''
-    opencv支持
-
-    if position.shape[0] != 0:
-        image = cv2.rectangle(image, (position[0, 0], position[0, 1]), (position[0, 2], position[0, 3]), (0, 255, 0), 2)
-    # 更改双线性插值为区域插值，图像处理完效果好于双线性插值
-    image = cv2.resize(image, (80, 80), interpolation=cv2.INTER_AREA)
-    '''
-    done = 0
-    reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
-    if float(gap) <= 3 or float(gap) >= 300:
-        done = 1  
-        reward = -1.0
-    elif episode_len > 480:
-        done = 2 
-        # reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
-
-    return image, reward, done, float(gap), float(v_ego1), float(v_lead), float(a_ego1)
-
-
-def CalReward(gap, v_ego, v_lead, force):
-    Rd, Rp = 0, 0
-    Rd, Rp = 0, 1
-
-    if force>0:
-        a = 3.5*force
+        proportion_ = np.array((int(position[0, 2]) * int(position[0, 3])) / (400 * 400))
     else:
-        a = 5.5*force
-        
-    L0 = -3.037
-    L1 = -0.591
-    L3 = -1.047e-3
-    L4 = -1.403
-    L5 = 2.831e-2
-    L8 = -7.98e-2
-    L11 = 3.535e-3
-    L12 = -0.243
-    Rp = (L0 + L1*v_ego + L3*(v_ego**3) + L4* v_ego * a + L5*(v_ego**2) + L8 * (v_ego**2) * a + L11 * (v_ego**3) * a + L12 * v_ego * (a**2))
-    if Rp>0:
-        Rp = 0
-    Rp = Rp + 195
-    if v_ego > 40:
+        proportion_ = np.array(0)
+    # 计算reward
+    done_ = 0
+    v_relative = v_ego1_ - v_lead1_
+    action_relative = ((v_ego1_ - v_ego_) / 0.5) - ((v_lead1_ - v_lead_) / 0.5)
+    action_best = (2 * (-(Distance_EF - float(gap_)) - v_relative * Return_Time)) / (Return_Time ** 2)
+
+    # 动力学公式
+    # reward_ = CalReward(action_relative, action_best, gap_)
+    # 平滑reward
+    reward_ = cal_reward(gap_, v_ego1_, force, episode_len)
+
+    if gap_ <= 3 or gap_ >= 300:
+        done_ = 1
+        reward_ = -1.0
+    elif episode_len > 480:
+        done_ = 2
+        # reward = CalReward(float(gap), float(v_ego), float(v_lead), force)
+    return proportion_, float(reward_), done_, float(gap_), float(v_ego1_), float(v_lead1_), float(a_ego1_)
+
+
+# 修改正态分布中的方差值，需要重新将正态分布归一化
+def CalReward(action_relative_, action_best_, gap_):
+    try:
+        reward_recal = (np.exp(-(action_relative_ - action_best_) ** 2 / (2 * (Variance ** 2))))
+    except FloatingPointError as e:
+        reward_recal = 0
+
+    if 40 <= gap_ <= 60:
+        pass
+    elif 5 < gap_ < 40:
+        reward_recal = reward_recal * ((1 / 35) * gap_ - (1 / 7))
+    elif 60 <= gap_ <= 300:
+        reward_recal = reward_recal * (- (1 / 240) * gap_ + (5 / 4))
+    return reward_recal
+
+
+def cal_reward(gap_, x, y, ep_len):
+    p00 = 1.007
+    p10 = -0.01203
+    p01 = 1.516e-06
+    p20 = -0.0002435
+    p11 = -4.13e-07
+    p02 = -0.04686
+    p30 = 1.698e-05
+    p21 = 1.064e-08
+    p12 = -0.03628
+    p03 = 3.062e-06
+    Rp = p00 + p10*x + p01*y + p20*x**2 + p11*x*y + p02*y**2 + p30*x**3 + p21*x**2*y + p12*x*y**2 + p03*y**3
+
+    if x > 30:
         Rp = 0
     # reward for gap
-    if gap >= 40 and gap <= 60:
+    if 50 <= gap_ <= 70:
         Rd = 1
-    elif gap >= 30 and gap < 40:
+    elif 30 <= gap_ < 50:
         Rd = 0.5
-    elif gap > 60 and gap <= 100:
-        Rd = 0.5        
+    elif 70 < gap_ <= 100:
+        Rd = 0.5
     else:
         Rd = 0.0
-    # if gap >= 40 and gap <= 60:
-    #     Rd = 1
-    # elif gap >= 30 and gap < 40:
-    #     Rd = np.power(1.29, (gap - 40))
-    # elif gap > 60 and gap <= 100:
-    #     Rd = np.power(1.29, (-gap + 60))     
-    # else:
-    #     Rd = 0
 
-    # return Rp*Rd
-    return Rp*Rd/195.0
+    # reward for gap poly
+    # r1 = -2.428e-03
+    # r2 = -2.340e-05
+    # r3 = 7.463e-06
+    # r4 = -4.440e-01
+    # r5 = 5.132e-03
+    # r6 = -2.674e-05
+    # r7 = 5.246e-08
+    # r8 = 14.82323484
+    # r9 = 1e-03
+    #
+    # if 50 <= gap_ <= 70:
+    #     Rd = 1
+    # elif 3 <= gap_ < 50:
+    #     Rd = r1*gap_ - r2*gap_**2 + r3*gap_**3
+    # elif 70 < gap_ <= 150:
+    #     Rd = r4*gap_ + r5*(gap_**2) + r6*(gap_**3) + r7*(gap_**4) + r8
+    # else:
+    #     Rd = 0.0
+    # Rd = Rd + (r9 * ep_len)
+    return Rp * Rd
 
 
 def reset():
@@ -348,9 +372,9 @@ def log_File_path(path):
     # date = str(dt.date.today()).split('-')
     # date_concat = date[1] + date[2]
     date_concat = time_Feature
-    train_log = open(os.path.join(path, 'train_log_{}.txt'.format(date_concat)), 'w')
+    train_log_ = open(os.path.join(path, 'train_log_{}.txt'.format(date_concat)), 'w')
     del date_concat
-    return train_log
+    return train_log_
 
 
 def random_sample(state_t, v_t, state_t1, v_t1):
@@ -362,53 +386,52 @@ def random_sample(state_t, v_t, state_t1, v_t1):
     return state_t, v_t, state_t1, v_t1
 
 
-def Recv_data_Format(byte_size, _done, v_ego=None, action=None, episode_len=None, s_t=None, v_ego_t=None):
+def Recv_data_Format(byte_size, _done, v_ego_=None, v_lead1_=None, action_=None, episode_len_=None, s_t_=None, v_ego_t_=None):
     if _done != 0: 
-        revcData, (remoteHost, remotePort) = sock.recvfrom(byte_size)
-        image, _, _, gap, v_ego, _, a_ego = decode(revcData)
-        x_t = agent.process_image(image)
+        revcData, (remoteHost_, remotePort_) = sock.recvfrom(byte_size)
+        proportion, _, _, gap_, v_ego_, v_lead1_, a_ego = decode(revcData)
+        x_t = proportion
 
-        s_t = np.stack((x_t, x_t, x_t, x_t), axis=0)
-        v_ego_t = np.array((v_ego, v_ego, v_ego, v_ego))
+        s_t_ = np.stack((x_t, x_t, x_t, x_t), axis=0)
+        v_ego_t_ = np.array((v_ego_, v_ego_, v_ego_, v_ego_))
 
-        # In Keras, need to reshape
-        s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2]) #1*80*80*4
-        v_ego_t = v_ego_t.reshape(1, v_ego_t.shape[0]) #1*4
-        return s_t, v_ego_t, v_ego, remoteHost, remotePort
+        s_t_ = s_t_.reshape(1, s_t_.shape[0])     # 1*4
+        v_ego_t_ = v_ego_t_.reshape(1, v_ego_t_.shape[0])   # 1*4
+        return s_t_, v_ego_t_, v_ego_, v_lead1_, remoteHost_, remotePort_
     else:
-        revcData, (remoteHost, remotePort) = sock.recvfrom(byte_size)
-        image, reward, done, gap, v_ego1, v_lead, a_ego1 = decode(revcData, v_ego, action, episode_len)
+        revcData, (remoteHost_, remotePort_) = sock.recvfrom(byte_size)
 
-        x_t1 = agent.process_image(image)
-        x_t1 = x_t1.reshape(1, 1, x_t1.shape[0], x_t1.shape[1])     # 1x1x80x80
-        s_t1 = np.append(x_t1, s_t[:, :3, :, :], axis=1)    # 1x4x80x80
-        v_ego_1 = np.array(v_ego1)
-        v_ego_1 = np.expand_dims(v_ego_1, -1)
-        v_ego_1 = np.expand_dims(v_ego_1, -1)
-        v_ego_t1 = np.append(v_ego_1, v_ego_t[:, :3], axis=1)   # 1x4
-        return reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1
+        proportion, reward_, done_, gap_, v_ego1_, v_lead1_, a_ego1_ = decode(revcData, v_ego_, v_lead1_, action_, episode_len_)
+
+        x_t1 = proportion
+        x_t1 = x_t1.reshape(1, 1)     # 1x1
+        s_t1_ = np.append(x_t1, s_t_[:, :3], axis=1)    # 1x4x80x80
+        v_ego_1_reshape = np.array(v_ego1_)
+        v_ego_1_reshape = np.expand_dims(v_ego_1_reshape, -1)
+        v_ego_1_reshape = np.expand_dims(v_ego_1_reshape, -1)
+        v_ego_t1_ = np.append(v_ego_1_reshape, v_ego_t_[:, :3], axis=1)   # 1x4
+        return reward_, done_, gap_, v_ego1_, v_lead1_, a_ego1_, v_ego_1_reshape, s_t1_, v_ego_t1_
 
 
-# def Send_data_Format(remoteHost, remotePort, onlyresetloc, s_t, v_ego_t):
-def Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset):
+def Send_data_Format(remoteHost_, remotePort_, s_t_, v_ego_t_, episode_len_, UnityReset_):
     pred_time_pre = dt.datetime.now()
-    episode_len = episode_len + 1            
+    episode_len_ = episode_len_ + 1
     # Get action for the current state and go one step in environment
-    s_t = torch.Tensor(s_t).to(device)
-    v_ego_t = torch.Tensor(v_ego_t).to(device)
-    force = agent.get_action([s_t, v_ego_t])
+    s_t_ = torch.Tensor(s_t_).to(device)
+    v_ego_t_ = torch.Tensor(v_ego_t_).to(device)
+    force = agent.get_action([s_t_, v_ego_t_])
     action = force
       
-    if UnityReset == 1: 
+    if UnityReset_ == 1:
         strr = str(4) + ',' + str(action)
-        UnityReset = 0
+        UnityReset_ = 0
     else:
         strr = str(1) + ',' + str(action)
     
-    sendDataLen = sock.sendto(strr.encode(), (remoteHost, remotePort))# 0.06s later receive
+    sendDataLen = sock.sendto(strr.encode(), (remoteHost_, remotePort_))    # 0.06s later receive
     pred_time_end = dt.datetime.now()
     time_cost = pred_time_end - pred_time_pre
-    return episode_len, action, time_cost, UnityReset
+    return episode_len_, action, time_cost, UnityReset_
 
 
 def Model_save_Dir(PATH, time):
@@ -427,7 +450,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -440,18 +463,17 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model(TEST_MODEL_PATH)
-        agent.model.eval()
-        agent.target_model.eval()
+        agent.load_model('./save_Model/save_model_1633168898/save_model_298.h5')
+    elif agent.train_from_checkpoint:
+        agent.load_model(CHECK_POINT_TRAIN_PATH)
+        print(f'Now we load checkpoints for continue training:  {CHECK_POINT_TRAIN_PATH.split("/")[-1]}')
     else:
-        # train_thread = threading.Thread(target=thread_Train_init)
-        # train_thread.start()
         print('Thread Ready!!!')
     done = 0
 
     # 增加yolo目标检测算法支持
     torch.hub.set_dir('./')
-    yolo = torch.hub.load('ultralytics/yolov5', 'yolov5s').to(device)
+    yolo = torch.hub.load('ultralytics/yolov5', 'custom', path='./weights/nc1_car.pt').to(device)
 
     for e in range(EPISODES):      
         print("Episode: ", e)
@@ -466,7 +488,7 @@ if __name__ == "__main__":
             print('done value:', done)
             print("new fresh episode!")
             done = 1
-            s_t, v_ego_t, v_ego, remoteHost, remotePort = Recv_data_Format(unity_Block_size, done)
+            s_t, v_ego_t, v_ego, v_lead, remoteHost, remotePort = Recv_data_Format(unity_Block_size, done)
             done = 0
             UnityReset = 0
             episode_len = 0
@@ -476,7 +498,7 @@ if __name__ == "__main__":
             if agent.t % 1000 == 0:
                 rewardTot = []
             episode_len, action, time_cost, UnityReset = Send_data_Format(remoteHost, remotePort, s_t, v_ego_t, episode_len, UnityReset)
-            reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1 = Recv_data_Format(unity_Block_size, done, v_ego, action, episode_len, s_t, v_ego_t)
+            reward, done, gap, v_ego1, v_lead, a_ego1, v_ego_1, s_t1, v_ego_t1 = Recv_data_Format(unity_Block_size, done, v_ego, v_lead, action, episode_len, s_t, v_ego_t)
             rewardTot.append(reward)
             start_count_time = int(round(time.time() * 1000))
             
@@ -490,12 +512,19 @@ if __name__ == "__main__":
             v_ego = v_ego_1
             agent.t = agent.t + 1
 
-            print("EPISODE",  e, "TIMESTEP", agent.t,"/ ACTION", action, "/ REWARD", reward, "Avg REWARD:",
-                    sum(rewardTot)/len(rewardTot) , "/ EPISODE LENGTH", episode_len, "/ Q_MAX " ,
-                    agent.max_Q, "/ time " , time_cost, a_ego1)
-            format_str = ('EPISODE: %d TIMESTEP: %d EPISODE_LENGTH: %d ACTION: %.4f REWARD: %.4f Avg_REWARD: %.4f training_Loss: %.4f Q_MAX: %.4f gap: %.4f  v_ego: %.4f v_lead: %.4f time: %.0f a_ego: %.4f')
-            text = (format_str % (e, agent.t, episode_len, action, reward, sum(rewardTot)/len(rewardTot), agent.trainingLoss*1e3, agent.max_Q, gap, v_ego1, v_lead, time.time()-start_time, a_ego1))
-            print_out(train_log, text)
+            print("EPISODE",  e, "TIMESTEP", agent.t, "/ ACTION", format(action, '.4f'), "/ REWARD", format(reward, '.4f'), "Avg REWARD:",
+                  format(sum(rewardTot)/len(rewardTot), '.4f'), "/ EPISODE LENGTH", episode_len, "/ Q_MAX ",
+                  format(agent.max_Q, '.4f'), '/ area_size ', format(s_t[0, 0].item(), '.4f'))
+            # format_str = ('EPISODE: %d TIMESTEP: %d EPISODE_LENGTH: %d ACTION: %.4f REWARD: %.4f Avg_REWARD: %.4f training_Loss: %.4f Q_MAX: %.4f gap: %.4f  v_ego: %.4f v_lead: %.4f time: %.0f a_ego: %.4f')
+            # text = (format_str % (e, agent.t, episode_len, action, reward, sum(rewardTot)/len(rewardTot), agent.trainingLoss*1e3, agent.max_Q, gap, v_ego1, v_lead, time.time()-start_time, a_ego1))
+            # print_out(train_log, text)
+            format_str = f'EPISODE: {e} TIMESTEP: {agent.t} EPISODE_LENGTH: {episode_len} ' \
+                         f'ACTION: {action:.4f} REWARD: {reward:.4f} ' \
+                         f'Avg_REWARD: {sum(rewardTot) / len(rewardTot):.4f} train_loss: {agent.trainingLoss:.4f} ' \
+                         f'Qmax: {agent.max_Q:.4f} gap: {gap:.4f} ' \
+                         f'v_ego: {v_ego1:.4f} v_lead: {v_lead:.4f} a_ego: {a_ego1:.4f} '
+            print_out(train_log, format_str)
+
             if done:
                 agent.update_target_model()
                 episodes.append(e)
@@ -508,8 +537,3 @@ if __name__ == "__main__":
                     reset()
                     time.sleep(0.5)
             print('Data receive from unity, time:', int(round(time.time() * 1000) - start_count_time))
-
-        # Tensorboard_saver = tf.summary.FileWriter('E:/Python_Project/Enhence_Learning/Tensorboard/', tf.get_default_graph())
-        # lp = LineProfiler()
-        # lp_wrapper = lp(agent.train_replay())
-        # lp.print_stats()
