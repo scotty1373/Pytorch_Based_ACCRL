@@ -254,9 +254,9 @@ def decode(revcData, v_ego_=0, v_lead_=0, force=0, episode_len=0, v_ego_copy_=0,
 
     # 当前代码问题，yolo输出锚框为1时选取锚框问题，暂时解决通过取消squeeze
     # !!!锚框缺失问题!!!
-    position = np.array(xyxy2xywh(anchor_box.pred[0]), dtype='uint8')
+    position = np.array(xyxy2xywh(anchor_box.pred[0].cpu()), dtype='uint8')
     if position.shape[0] != 0:
-        proportion_ = np.array((int(position[0, 2]) * int(position[0, 3])) / (400 * 400))
+        proportion_ = np.array(((int(position[0, 2]) * int(position[0, 3])) / (400 * 400)) * 10)
     else:
         proportion_ = np.array(0)
     # 计算reward

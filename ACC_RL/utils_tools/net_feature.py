@@ -6,15 +6,19 @@ import numpy as np
 class yolo_feature_processor(torch.nn.Module):
     def __init__(self, innershape, outshape):
         super(yolo_feature_processor, self).__init__()
-        self.Dense1 = torch.nn.Linear(innershape, 32)
+        self.Dense1 = torch.nn.Linear(innershape, 64)
         self.activation1 = torch.nn.ReLU(inplace=True)
-        self.Dense2 = torch.nn.Linear(32, 64)
+        self.Dense2 = torch.nn.Linear(64, 128)
         self.activation2 = torch.nn.ReLU(inplace=True)
         self.inputDense1 = torch.nn.Linear(4, 32)
         self.activation_iD = torch.nn.ReLU(inplace=True)
-        self.catDense1 = torch.nn.Linear(96, 32)
-        self.catactivation = torch.nn.ReLU(inplace=True)
-        self.catDense2 = torch.nn.Linear(32, outshape)
+        self.catDense1 = torch.nn.Linear(160, 128)
+        self.catactivation1 = torch.nn.ReLU(inplace=True)
+        self.catDense2 = torch.nn.Linear(128, 64)
+        self.catactivation2 = torch.nn.ReLU(inplace=True)
+        self.catDense3 = torch.nn.Linear(64, 32)
+        self.catactivation3 = torch.nn.ReLU(inplace=True)
+        self.catDense4 = torch.nn.Linear(32, outshape)
 
     def forward(self, x_, y_):
         out = self.Dense1(x_)
@@ -25,8 +29,12 @@ class yolo_feature_processor(torch.nn.Module):
         alterout = self.activation_iD(alterout)
         concat_vector = torch.cat([out, alterout], dim=1)
         concat_vector = self.catDense1(concat_vector)
-        concat_vector = self.catactivation(concat_vector)
+        concat_vector = self.catactivation1(concat_vector)
         concat_vector = self.catDense2(concat_vector)
+        concat_vector = self.catactivation2(concat_vector)
+        concat_vector = self.catDense3(concat_vector)
+        concat_vector = self.catactivation3(concat_vector)
+        concat_vector = self.catDense4(concat_vector)
         return concat_vector
 
 

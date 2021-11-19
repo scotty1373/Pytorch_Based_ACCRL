@@ -11,53 +11,67 @@ seterr(all='raise')
 # np.set_printoptions(suppress=True, threshold=10000, linewidth=10000)
 np.set_printoptions(suppress=True, threshold=10000)
 
-
 # vaild sele
 # MENU = sys.argv[1]
 # FILE_PATH = sys.argv[2]
 
 # test sele
-MENU = 'graph'
-FILE_PATH = 'train_log_1636451162.txt'
+MENU = 'proc'
+FILE_PATH = 'train_log_1636640661_yolo面积计算.txt'
 Timestamp = time.time()
 
 date = str(dt.date.today)[1] + str(dt.date.today)[2]
-
+data_num_in_line = 24
 episode_filter = 349
 
 
 # Internal document processing(single line)
-def str2list(_data_line):
-    _data_line = _data_line.rstrip('\n').split(' ', 26)
-    _data_line.pop(18)
+def str2list(_data_line, version_old=False):
     _frame_list = []
-    _seq = [t for t in range(1, 26, 2)]
+    #               已更新训练代码
+    # 由于gap与v_ego数据之间有空行，需要抛去空行所占strip位置
+    if version_old:
+        _data_line = _data_line.rstrip('\n').split(' ', 26)
+        _data_line.pop(18)
+        _seq = [t for t in range(1, 26, 2)]
+    else:
+        _data_line = _data_line.rstrip('\n').split(' ', data_num_in_line)
+        _seq = [t for t in range(1, data_num_in_line, 2)]
     for t in _seq:
         _frame_list.append(_data_line[t])
     return _frame_list
 
 
 # Txt file to csv model
-def txt2csv(path):
+def txt2csv(path, old=False):
     fp = open(path, "r")
     # 临时变量
     data_lens_temp = fp.readlines()
     data_lens = len(data_lens_temp)
-    print('file %s lines read: %s' %(path, str(data_lens)) )
+    print('file %s lines read: %s' % (path, str(data_lens)))
     # 内存释放
     del data_lens_temp
     fp.seek(0, 0)
     # 参数初始化s
-    df_list = np.zeros(shape=(data_lens, 13))
+    if old:
+        df_list = np.zeros(shape=(data_lens, int(26 / 2)))
+    else:
+        df_list = np.zeros(shape=(data_lens, int(data_num_in_line / 2)))
     for _i in range(data_lens):
         data_pre_line = fp.readline()
-        df_list[_i] = str2list(data_pre_line)
+        df_list[_i] = str2list(data_pre_line, old)
     df_dataset = pd.DataFrame(df_list)
-    df_dataset.columns = ['EPISODE', 'TIMESTAMP', 'EPISODE_LENGTH', 'ACTION',
-                    'REWARD', 'Avg_REWARD', 'training_Loss', 'Q_MAX',
-                    'gap', 'v_ego', 'v_lead', 'time', 'a_ego']
-    df_dataset.to_csv(f'train_csv{str(Timestamp).split(".")[0]}.csv')
-    print('txt transfom to csv successful')
+
+    if old:
+        df_dataset.columns = ['EPISODE', 'TIMESTAMP', 'EPISODE_LENGTH', 'ACTION',
+                              'REWARD', 'Avg_REWARD', 'train_loss', 'Qmax',
+                              'gap', 'v_ego', 'v_lead', 'time', 'a_ego']
+    else:
+        df_dataset.columns = ['EPISODE', 'TIMESTAMP', 'EPISODE_LENGTH', 'ACTION',
+                              'REWARD', 'Avg_REWARD', 'train_loss', 'Qmax',
+                              'gap', 'v_ego', 'v_lead', 'a_ego']
+    df_dataset.to_csv(f'{os.path.splitext(path)[0]}.csv')
+    print('txt transform to csv successful')
     fp.close()
 
 
@@ -79,7 +93,7 @@ def plot_action_reward_gap_v_(EPISODE, ACTION, gap, v_ego, v_lead):
     # plt.grid(axis='y',color='grey',linestyle='--',lw=0.5,alpha=0.5)
     # plt.tick_params(axis='both',labelsize=14)
     plot1 = ax1.plot(epoch_iter, gap_mean, 'r')
-    ax1.set_ylabel('gap', fontsize = 18)
+    ax1.set_ylabel('gap', fontsize=18)
     ax2 = ax1.twinx()
     plot2 = ax2.plot(epoch_iter, action_mean, 'g')
     plt.show()
@@ -106,7 +120,7 @@ def plot_reward_action_crash(EPISODE, ACTION, gap, EPISODE_LENGTH):
     gap_crash = gap[crash_index_[:, 0]]
     gap_loss = gap[loss_index_[:, 0]]
     gap_done = gap[done_index_[:, 0]]
-    
+
     action_mean = []
     for i in epoch_iter:
         start_index = np.argwhere(EPISODE == i)[0][0]
@@ -115,7 +129,7 @@ def plot_reward_action_crash(EPISODE, ACTION, gap, EPISODE_LENGTH):
     fig, ax1 = plt.subplots(figsize=(10, 3))
     title = 'policy_based'
     print(f'Crash index:{EPISODE[crash_index_[:, 0]].reshape(1, -1)}')
-    print(f'Loss index:{EPISODE[loss_index_[:, 0]].reshape(1,-1)}')
+    print(f'Loss index:{EPISODE[loss_index_[:, 0]].reshape(1, -1)}')
     plt.title(title, fontsize=10)
     # plt.grid(axis='y',color='grey',linestyle='--',lw=0.5,alpha=0.5)
     # plt.tick_params(axis='both',labelsize=14)
@@ -175,7 +189,7 @@ def get_singal_info(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD,
 def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_, index_):
     length_ep, v_lead_, v_ego_, gap_, action_, reward_ = get_singal_info(EPISODE_, EPISODE_LENGTH_,
                                                                          _v_lead, _v_ego, _gap,
-                                                                         ACTION_, REWARD_, index_-1)
+                                                                         ACTION_, REWARD_, index_ - 1)
     # Plot val in graph
     ax_a_g = plt.subplot(411)
     ax_a_v = ax_a_g.twinx()
@@ -185,10 +199,10 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
 
     plt.legend(handles=[v_lead_g, v_ego_g, gap_g],
                labels=['v_lead', 'v_ego', 'gap'], loc=2)
-    plt.title('info_{}'.format(index_-1))
+    plt.title('info_{}'.format(index_ - 1))
     plt.xlabel('Epoch', size=10)
-    plt.ylabel('info_{}'.format(index_-1), size=10)
-    
+    plt.ylabel('info_{}'.format(index_ - 1), size=10)
+
     plt.subplot(412)
     action_g, = plt.plot(length_ep, action_, linewidth=2, color='C4')
     reward_g, = plt.plot(length_ep, reward_, linewidth=2, color='C5', linestyle=':')
@@ -227,13 +241,13 @@ def plot_singal_info(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, 
     plt.title('info_{}'.format(index_))
     plt.xlabel('Epoch', size=10)
     plt.ylabel('info_{}'.format(index_), size=10)
-    
+
     plt.subplot(414)
     action_g, = plt.plot(length_ep, action_, linewidth=2, color='C4')
     reward_g, = plt.plot(length_ep, reward_, linewidth=2, color='C5', linestyle=':')
     plt.legend(handles=[action_g, reward_g],
                labels=['action', 'reward'], loc=2)
-    
+
     plt.show()
 
 
@@ -256,8 +270,9 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
     acc_relative = np.zeros((len(length_ep), 1))
     for index in range(1, len(length_ep)):
         try:
-            acc_relative[index, :] = (v_relative[index, :]**2 - v_relative[index - 1, :]**2) / (2 * (gap_[index, :] - gap_[index-1, :]))
-        except FloatingPointError as e:     # numpy将所有0/0错误归于FloatingPointError，第十行定义numpy抛出所有警告类型为错误，即可捕获RunTimeWarning
+            acc_relative[index, :] = (v_relative[index, :] ** 2 - v_relative[index - 1, :] ** 2) / (
+                        2 * (gap_[index, :] - gap_[index - 1, :]))
+        except FloatingPointError as e:  # numpy将所有0/0错误归于FloatingPointError，第十行定义numpy抛出所有警告类型为错误，即可捕获RunTimeWarning
             print(f"index {index} gap has no change")
             acc_relative[index, :] = 0
 
@@ -289,10 +304,14 @@ def relative(EPISODE_, EPISODE_LENGTH_, _v_lead, _v_ego, _gap, ACTION_, REWARD_,
     for index in range(len(length_ep)):
         # reward_recal[index, :] = np.exp((action_[index, :] - 0.5 - (-(50 - gap_[index, :] - v_relative[index, :] * t) / ((2 * t) ** 2))) / 2 * 0.5 ** 2) / (np.sqrt(2 * np.pi) * 0.5) * 0.5 / 0.8
         try:
-            reward_recal[index, :] = (np.exp(-(acc_compare[index, :] - action_best[index, :]) ** 2 / (2 * (0.3 ** 2))) / (np.sqrt(2 * np.pi) * 0.3)) / 1.4
+            reward_recal[index, :] = (np.exp(
+                -(acc_compare[index, :] - action_best[index, :]) ** 2 / (2 * (0.3 ** 2))) / (
+                                                  np.sqrt(2 * np.pi) * 0.3)) / 1.4
         except FloatingPointError as e:
             reward_recal[index, :] = 0
-    print(np.concatenate([np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, action_best, acc_compare, acc_ego_, acc_lead_, reward_recal], axis=1))
+    print(np.concatenate(
+        [np.arange(0, len(length_ep)).reshape(-1, 1), v_lead_, v_ego_, gap_, action_, reward_, action_best, acc_compare,
+         acc_ego_, acc_lead_, reward_recal], axis=1))
     print(f'acc max:{acc_compare[:, 0].max()}')
     print(f'acc min:{acc_compare[:, 0].min()}')
     print(f'v_relative max:{v_relative[:, 0].max()}')
@@ -333,7 +352,8 @@ def Caculate_reward(v_ref, g_ref, a_ref):
     a8 = -2.0589e-2
     a9 = 6.83969e-2
     a10 = 1.116254
-    Function = a1*(v_ref**2) + a2*(g_ref**2) + a3*(a_ref**2) + a4*v_ref*g_ref + a5*g_ref*a_ref + a6*v_ref*a_ref + a7*v_ref + a8*g_ref + a9*a_ref + a10
+    Function = a1 * (v_ref ** 2) + a2 * (g_ref ** 2) + a3 * (
+                a_ref ** 2) + a4 * v_ref * g_ref + a5 * g_ref * a_ref + a6 * v_ref * a_ref + a7 * v_ref + a8 * g_ref + a9 * a_ref + a10
 
     return Function
 
@@ -359,7 +379,11 @@ def prof_reward_adder(ep_, ep_len_, reward_):
 
 if __name__ == '__main__':
     if MENU == 'proc':
-        txt2csv(FILE_PATH)
+        args_file = input('The log file record is old version(y/n): ')
+        if args_file == 'y':
+            txt2csv(FILE_PATH, True)
+        else:
+            txt2csv(FILE_PATH)
     elif MENU == 'graph':
         list_dir = os.listdir()
         print('File under current path: ', list_dir)
@@ -379,8 +403,6 @@ if __name__ == '__main__':
         gap = np.array(df.iloc[0:row, 9:10], dtype=float)
         v_ego = np.array(df.iloc[0:row, 10:11], dtype=float)
         v_lead = np.array(df.iloc[0:row, 11:12], dtype=float)
-        time = np.array(df.iloc[0:row, 12:13], dtype=float)
-        a_ego = np.array(df.iloc[0:row, 13:14], dtype=float)
 
         prof_reward_adder(EPISODE, EPISODE_LENGTH, REWARD)
 
@@ -392,6 +414,3 @@ if __name__ == '__main__':
             crash_index = input('Enter the crash index you want to view: ')
             relative(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
             plot_singal_info(EPISODE, EPISODE_LENGTH, v_lead, v_ego, gap, ACTION, REWARD, int(crash_index))
-
-
-

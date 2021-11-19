@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 from collections import deque
-from net_builder import Data_dim_reduce as build_model
+from utils_tools.net_builder import Data_dim_reduce as build_model
 import numpy as np
 import skimage
 import torch
@@ -226,8 +226,6 @@ def linear_unbin(arr):
     b = np.argmax(arr)
     a = b * 2 / 20 - 1
     return a
-# def oberve():
-#   revcData, (remoteHost, remotePort) = sock.recvfrom(65536)
 
 
 def decode(revcData, v_ego = 0, force = 0, episode_len = 0):
@@ -273,7 +271,7 @@ def CalReward(gap, v_ego, v_lead, force):
     L11 = 3.535e-3
     L12 = -0.243
     Rp = (L0 + L1*v_ego + L3*(v_ego**3) + L4* v_ego * a + L5*(v_ego**2) + L8 * (v_ego**2) * a + L11 * (v_ego**3) * a + L12 * v_ego * (a**2))
-    if Rp>0:
+    if Rp > 0:
         Rp = 0
     Rp = Rp + 195
     if v_ego > 40:
