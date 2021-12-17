@@ -16,6 +16,7 @@ from torch.autograd import Variable
 
 from PIL import Image, ImageDraw
 from skimage import color
+from pytorch_grad_cam import GradCAMPlusPlus
 
 np.set_printoptions(precision=4)
 
@@ -43,7 +44,7 @@ class DQNAgent:
         self.t = 0
         self.max_Q = 0
         self.trainingLoss = 0
-        self.train = True
+        self.train = False
         self.train_from_checkpoint = False
 
         # Get size of state and action
@@ -168,7 +169,7 @@ class DQNAgent:
         self.trainingLoss = loss.item()
 
     def load_model(self, name):
-        checkpoints = torch.load(name)
+        checkpoints = torch.load(name, map_location='cuda' if torch.cuda.is_available() else 'cpu')
         self.model.load_state_dict(checkpoints['model'])
         self.optimizer.load_state_dict(checkpoints['optimizer'])
 
@@ -451,8 +452,8 @@ def Model_save_Dir(PATH, time):
     if not os.path.exists(path_to_return):
         os.mkdir(path_to_return)   
     return path_to_return
-   
-    
+
+
 if __name__ == "__main__":
     if not os.path.exists('./' + PATH_LOG):
         os.mkdir(os.path.join(os.getcwd().replace('\\', '/'), PATH_LOG))
@@ -462,7 +463,7 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('127.0.0.1', 8001))
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     # Get size of state and action from environment
     state_size = (img_rows, img_cols, img_channels)
@@ -475,7 +476,7 @@ if __name__ == "__main__":
 
     if not agent.train:
         print("Now we load the saved model")
-        agent.load_model('./save_Model/save_model_1633168898/save_model_298.h5')
+        agent.load_model('./save_Model/save_model_1631599540/save_model_288.h5')
     elif agent.train_from_checkpoint:
         agent.load_model(CHECK_POINT_TRAIN_PATH)
         print(f'Now we load checkpoints for continue training:  {CHECK_POINT_TRAIN_PATH.split("/")[-1]}')
